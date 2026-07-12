@@ -1,0 +1,98 @@
+name: Provision and Deploy MCP Servers
+
+# Click "Run workflow" in the GitHub Actions tab to provision infrastructure,
+# build & push all three container images to ACR, and deploy them to Azure
+# Container Apps. Authentication uses OIDC federation (no stored secrets).
+
+on:
+  workflow_dispatch:
+    inputs:
+      resourceGroup:
+        description: "Azure resource group name"
+        required: true
+        default: "rg-mcp"
+      location:
+        description: "Azure region"
+        required: true
+        default: "eastus"
+      namePrefix:
+        description: "Resource name prefix (3-11 lowercase chars)"
+        required: true
+        default: "mcp"
+
+permissions:
+  id-token: write # required for OIDC login
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Create resource group
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            az group create -n "${{ inputs.resourceGroup }}" -l "${{ inputs.location }}"
+
+      - name: Provision infrastructure
+        id: infra
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            az deployment group create \
+              --name mcp-infra \
+              -g "${{ inputs.resourceGroup }}" \
+              -f infra/main.bicep \
+              -p namePrefix="${{ inputs.namePrefix }}" \
+                 azLensSubscriptionId="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+            ACR_NAME=$(az deployment group show -g "${{ inputs.resourceGroup }}" -n mcp-infra --query properties.outputs.acrName.value -o tsv)
+            ACR_SERVER=$(az deployment group show -g "${{ inputs.resourceGroup }}" -n mcp-infra --query properties.outputs.acrLoginServer.value -o tsv)
+            echo "acrName=$ACR_NAME" >> "$GITHUB_OUTPUT"
+            echo "acrServer=$ACR_SERVER" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push container images
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            ACR=${{ steps.infra.outputs.acrName }}
+            SHA=${{ github.sha }}
+            az acr build -r "$ACR" -t "mcp-local-coder:$SHA"        -t "mcp-local-coder:latest"        ./mcp-local-coder
+            az acr build -r "$ACR" -t "azlens-mcp:$SHA"             -t "azlens-mcp:latest"             ./AzLens-mcp
+            az acr build -r "$ACR" -t "mcp-personal-assistant:$SHA" -t "mcp-personal-assistant:latest" ./mcp-personal-assistant
+
+      - name: Deploy container apps with built images
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            SERVER=${{ steps.infra.outputs.acrServer }}
+            SHA=${{ github.sha }}
+            az deployment group create \
+              --name mcp-apps \
+              -g "${{ inputs.resourceGroup }}" \
+              -f infra/main.bicep \
+              -p namePrefix="${{ inputs.namePrefix }}" \
+                 azLensSubscriptionId="${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
+                 localCoderImage="$SERVER/mcp-local-coder:$SHA" \
+                 azLensImage="$SERVER/azlens-mcp:$SHA" \
+                 personalAssistantImage="$SERVER/mcp-personal-assistant:$SHA"
+
+            echo "## Deployed MCP endpoints" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            az deployment group show -g "${{ inputs.resourceGroup }}" -n mcp-apps \
+              --query "properties.outputs.{localCoder:localCoderUrl.value, azLens:azLensUrl.value, personalAssistant:personalAssistantUrl.value}" \
+              -o yaml >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"

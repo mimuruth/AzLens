@@ -1,0 +1,32 @@
+{
+  "mcpServers": {
+    "mcp-local-coder": {
+      "command": "node",
+      "args": [
+        "C:/ABSOLUTE/PATH/TO/mcp-workspace/mcp-local-coder/build/index.js"
+      ],
+      "env": {
+        "WORKSPACE_ROOT": "C:/ABSOLUTE/PATH/TO/your/projects"
+      }
+    },
+    "AzLens-mcp": {
+      "command": "node",
+      "args": [
+        "C:/ABSOLUTE/PATH/TO/mcp-workspace/AzLens-mcp/build/index.js"
+      ],
+      "env": {
+        "AZURE_SUBSCRIPTION_ID": "00000000-0000-0000-0000-000000000000",
+        "LOG_ANALYTICS_WORKSPACE_ID": "00000000-0000-0000-0000-000000000000"
+      }
+    },
+    "mcp-personal-assistant": {
+      "command": "node",
+      "args": [
+        "C:/ABSOLUTE/PATH/TO/mcp-workspace/mcp-personal-assistant/build/index.js"
+      ],
+      "env": {
+        "NOTES_ROOT": "C:/ABSOLUTE/PATH/TO/your/notes"
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "namePrefix": {
+      "value": "mcp"
+    },
+    "localCoderImage": {
+      "value": "mcr.microsoft.com/k8se/quickstart:latest"
+    },
+    "azLensImage": {
+      "value": "mcr.microsoft.com/k8se/quickstart:latest"
+    },
+    "personalAssistantImage": {
+      "value": "mcr.microsoft.com/k8se/quickstart:latest"
+    },
+    "azLensLogAnalyticsCustomerId": {
+      "value": ""
+    }
+  }
+}
