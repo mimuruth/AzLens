@@ -48,7 +48,7 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Create resource group
-        uses: azure/cli@v2
+        uses: azure/cli@v3
         with:
           azcliversion: latest
           inlineScript: |
@@ -56,7 +56,7 @@ jobs:
 
       - name: Provision infrastructure
         id: infra
-        uses: azure/cli@v2
+        uses: azure/cli@v3
         with:
           azcliversion: latest
           inlineScript: |
@@ -72,7 +72,7 @@ jobs:
             echo "acrServer=$ACR_SERVER" >> "$GITHUB_OUTPUT"
 
       - name: Build and push container images
-        uses: azure/cli@v2
+        uses: azure/cli@v3
         with:
           azcliversion: latest
           inlineScript: |
@@ -84,7 +84,7 @@ jobs:
             az acr build -r "$ACR" -t "chat-ui:$SHA"                -t "chat-ui:latest"                ./chat-ui
 
       - name: Deploy container apps with built images
-        uses: azure/cli@v2
+        uses: azure/cli@v3
         with:
           azcliversion: latest
           inlineScript: |
