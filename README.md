@@ -408,9 +408,9 @@ Then re-run `az deployment group create` passing the `*Image` parameters (see th
 | mcp-local-coder | `read_file` | `path` | Read a file inside `WORKSPACE_ROOT` |
 | mcp-local-coder | `write_file` | `path`, `content` | Create/overwrite a file (dirs auto-created) |
 | mcp-local-coder | `search_code` | `query` | Recursive case-insensitive text search |
-| AzLens-mcp | `query_azure_resource` | `resourceId` | Fetch an ARM resource by ID |
-| AzLens-mcp | `run_kql_query` | `workspaceId?`, `query` | Run a KQL query against Log Analytics |
-| AzLens-mcp | `search_wiki` | `query` | Search docs/wiki (stub — wire to your backend) |
+| AzLens-mcp | `query_azure_resource` | `resourceId` | Fetch an ARM resource by ID (returns a clear hint if not authenticated) |
+| AzLens-mcp | `run_kql_query` | `workspaceId?`, `query` | Run a KQL query against Log Analytics (returns a clear hint if not authenticated) |
+| AzLens-mcp | `search_wiki` | `query` | Search docs — backed by Microsoft Learn; extensible to internal wikis |
 | mcp-personal-assistant | `get_daily_notes` | `date` (YYYY-MM-DD) | Read that day's markdown notes |
 | mcp-personal-assistant | `update_todo_list` | `task`, `status` | Add/update a task (`todo`/`in-progress`/`done`) |
 
