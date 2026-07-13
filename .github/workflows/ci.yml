@@ -1,0 +1,32 @@
+name: CI
+
+# Runs the MCP smoke test on pull requests (and pushes to main) so regressions
+# are caught before the deploy workflow runs. No Azure credentials are needed —
+# the smoke test only exercises the servers over stdio.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install root tooling
+        run: npm install --no-audit --no-fund
+
+      - name: Run smoke test
+        run: npm run smoke

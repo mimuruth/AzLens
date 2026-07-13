@@ -1,0 +1,13 @@
+{
+  "name": "mcp-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP multi-server workspace — root dev tooling (smoke tests)",
+  "scripts": {
+    "smoke": "node scripts/smoke-test.mjs"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0"
+  }
+}

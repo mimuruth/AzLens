@@ -1,46 +1,273 @@
+
+```html
+<div align="center"><pre>
+   █████╗ ███████╗██╗     ███████╗███╗   ██╗███████╗
+  ██╔══██╗╚══███╔╝██║     ██╔════╝████╗  ██║██╔════╝
+  ███████║  ███╔╝ ██║     █████╗  ██╔██╗ ██║███████╗
+  ██╔══██║ ███╔╝  ██║     ██╔══╝  ██║╚██╗██║╚════██║
+  ██║  ██║███████╗███████╗███████╗██║ ╚████║███████║
+  ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═══╝╚══════╝
+              The context compression layer for AI agents
+</pre></div>
+```
+
+
 # MCP Multi-Server Workspace
 
-Three decoupled [Model Context Protocol](https://modelcontextprotocol.io) servers written in TypeScript, deployable to **Azure Container Apps**.
+**AzLens** is a TypeScript monorepo of three decoupled [Model Context Protocol](https://modelcontextprotocol.io) servers plus a ChatGPT-style web UI, deployable end-to-end to **Azure Container Apps** with a single GitHub Actions workflow.
 
-| Server | Purpose | Tools |
-| --- | --- | --- |
-| `mcp-local-coder` | Local file system + code search | `read_file`, `write_file`, `search_code` |
-| `AzLens-mcp` | Azure ARM / KQL / Wiki | `query_azure_resource`, `run_kql_query`, `search_wiki` |
-| `mcp-personal-assistant` | Notes + to-do lists | `get_daily_notes`, `update_todo_list` |
+| Component | Type | Purpose | Tools / Role |
+| --- | --- | --- | --- |
+| `mcp-local-coder` | MCP server | Local file system + code search | `read_file`, `write_file`, `search_code` |
+| `AzLens-mcp` | MCP server | Azure ARM / KQL / Wiki | `query_azure_resource`, `run_kql_query`, `search_wiki` |
+| `mcp-personal-assistant` | MCP server | Notes + to-do lists | `get_daily_notes`, `update_todo_list` |
+| `chat-ui` | Next.js app | ChatGPT-style front end | Azure OpenAI + MCP client over all three servers |
 
-Each server ships **two transports** from a single codebase:
-- **stdio** (`build/index.js`) — for local clients (Claude Desktop, VS Code).
-- **Streamable HTTP** (`build/http.js`) — for hosting on Azure Container Apps.
+Each MCP server ships **two transports** from a single codebase:
+
+- **stdio** (`build/index.js`) — for locally-spawned clients (Claude Desktop, VS Code).
+- **Streamable HTTP** (`build/http.js`) — for remote hosting on Azure Container Apps.
 
 ---
 
-## One-click deploy from GitHub
+## Table of contents
 
-After pushing this repo to GitHub and completing the [one-time setup](#one-time-azure-setup), open the **Actions** tab, select **Provision and Deploy MCP Servers**, and click **Run workflow**:
+- [Architecture](#architecture)
+- [Repository layout](#repository-layout)
+- [Prerequisites](#prerequisites)
+- [Quick start (local)](#quick-start-local)
+- [Configuration reference](#configuration-reference)
+- [Deploy to Azure](#deploy-to-azure)
+  - [One-time setup](#step-1--one-time-azure-setup-oidc)
+  - [chat-ui secrets](#step-2--chat-ui-secrets-azure-openai--entra)
+  - [Run the deployment](#step-3--run-the-deployment)
+  - [Post-deploy configuration](#step-4--post-deploy-configuration)
+- [Manual deploy](#manual-deploy-without-github-actions)
+- [Tools reference](#tools-reference)
+- [Operations & hardening](#operations--hardening)
+- [Troubleshooting](#troubleshooting)
+
+---
+
+## Architecture
+
+### Deployment topology
+
+Everything runs in one Container Apps environment. A single user-assigned managed identity pulls images from ACR; `AzLens-mcp` also uses it to query Azure. Only `chat-ui` is exposed to users behind Entra Easy Auth.
+
+```mermaid
+flowchart TB
+    User(["User (browser)"])
+
+    subgraph AZ["Azure resource group"]
+        subgraph ENV["Container Apps environment"]
+            CHAT["chat-ui<br/>(Next.js, Easy Auth)"]
+            S1["mcp-local-coder"]
+            S2["AzLens-mcp"]
+            S3["mcp-personal-assistant"]
+        end
+        ACR[("Azure Container<br/>Registry")]
+        MI["User-assigned<br/>managed identity"]
+        LOGS[("Log Analytics")]
+    end
+
+    AOAI["Azure OpenAI"]
+    ENTRA["Microsoft Entra ID"]
+    ARM["Azure Resource Manager<br/>+ Log Analytics data"]
+
+    User -->|HTTPS| CHAT
+    CHAT -->|sign-in| ENTRA
+    CHAT -->|chat completions| AOAI
+    CHAT -->|/mcp| S1
+    CHAT -->|/mcp| S2
+    CHAT -->|/mcp| S3
+    S2 -->|managed identity| ARM
+    MI -. AcrPull .-> ACR
+    ENV -. logs .-> LOGS
+    ACR -. images .-> ENV
+```
+
+### Request flow (a single chat turn)
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant C as chat-ui
+    participant O as Azure OpenAI
+    participant M as MCP server
+
+    U->>C: prompt
+    C->>O: messages + available MCP tools
+    O-->>C: tool call (e.g. read_file)
+    C->>M: JSON-RPC over /mcp (Streamable HTTP)
+    M-->>C: tool result
+    C->>O: tool result appended
+    O-->>C: streamed final answer
+    C-->>U: tokens streamed to browser
+```
+
+### CI/CD flow
+
+```mermaid
+flowchart LR
+    A[push to main<br/>or Run workflow] --> B[OIDC login to Azure]
+    B --> C[az group create]
+    C --> D[Deploy infra<br/>mcp-infra]
+    D --> E[az acr build x4]
+    E --> F[Deploy apps<br/>mcp-apps]
+    F --> G[Print endpoints<br/>in run summary]
+```
+
+---
+
+## Repository layout
+
+```text
+mcp-workspace/
+├─ .github/workflows/deploy.yml     # provision + build + deploy pipeline
+├─ infra/
+│  ├─ main.bicep                    # environment, ACR, identity, 3 MCP apps + chat-ui
+│  ├─ container-app.bicep           # reusable MCP container app module
+│  └─ main.parameters.json          # default parameter values
+├─ mcp-local-coder/                 # MCP server (files + code search)
+│  ├─ src/{server,index,http}.ts    # factory / stdio / HTTP entry points
+│  ├─ Dockerfile
+│  └─ package.json
+├─ AzLens-mcp/                      # MCP server (Azure ARM / KQL / Wiki)
+├─ mcp-personal-assistant/          # MCP server (notes + to-do)
+├─ chat-ui/                         # Next.js ChatGPT-style front end
+│  ├─ app/{page,layout}.tsx
+│  ├─ app/api/chat/route.ts         # Azure OpenAI + tool orchestration
+│  ├─ lib/mcp.ts                    # aggregates MCP tools from all 3 servers
+│  └─ Dockerfile
+└─ claude_desktop_config.json       # local stdio client config
+```
+
+Each MCP server is fully isolated — its own `package.json`, dependencies, and build. Within a server, tool logic lives once in `src/server.ts` (`createServer()`), reused by both `index.ts` (stdio) and `http.ts` (HTTP).
+
+---
+
+## Prerequisites
+
+| For | You need |
+| --- | --- |
+| Local development | Node.js 18+ (20/22 LTS recommended), npm |
+| Deployment | Azure subscription, [Azure CLI](https://learn.microsoft.com/cli/azure/), a GitHub repo |
+| chat-ui | An Azure OpenAI resource with a chat model deployment (e.g. `gpt-4o`) |
+| Easy Auth (optional) | Permission to create a Microsoft Entra app registration |
+
+---
+
+## Quick start (local)
+
+### 1. Build and run an MCP server (stdio)
+
+```bash
+cd mcp-local-coder
+npm install
+npm run build
+npm start            # stdio transport — for Claude Desktop / VS Code
+```
+
+To expose it over HTTP instead:
+
+```bash
+npm run start:http   # Streamable HTTP on http://localhost:3000/mcp
+```
+
+### 2. Use the servers from a local MCP client
+
+Point your client at [claude_desktop_config.json](claude_desktop_config.json) (replace the placeholder absolute paths). It maps all three servers over stdio.
+
+### 3. Run the chat UI locally
+
+Run each server on its own HTTP port, then start the UI:
+
+```bash
+# terminal 1
+cd mcp-local-coder        && PORT=3001 npm run start:http
+# terminal 2
+cd AzLens-mcp             && PORT=3002 npm run start:http
+# terminal 3
+cd mcp-personal-assistant && PORT=3003 npm run start:http
+
+# terminal 4
+cd chat-ui
+cp .env.example .env.local   # fill in Azure OpenAI + the MCP_*_URL values above
+npm install
+npm run dev                  # http://localhost:3000
+```
+
+---
+
+## Configuration reference
+
+All configuration is via environment variables. Locally use `.env` / `.env.local`; in Azure the Bicep template injects these (secrets are stored as Container Apps secrets).
+
+### `mcp-local-coder`
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `WORKSPACE_ROOT` | current working dir | Sandbox root; all file paths are constrained inside it |
+| `PORT` | `3000` | HTTP port (HTTP transport only) |
+
+### `AzLens-mcp`
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `AZURE_SUBSCRIPTION_ID` | — | Subscription queried by `query_azure_resource` |
+| `LOG_ANALYTICS_WORKSPACE_ID` | — | Default workspace for `run_kql_query` |
+| `AZURE_CLIENT_ID` | — | Set by Bicep to the managed identity for `DefaultAzureCredential` |
+| `PORT` | `3000` | HTTP port |
+
+Auth uses `DefaultAzureCredential`: `az login` locally, managed identity in Azure. No secrets are stored in code.
+
+### `mcp-personal-assistant`
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `NOTES_ROOT` | `~/mcp-notes` | Directory holding `YYYY-MM-DD.md` notes and `todo.md` |
+| `PORT` | `3000` | HTTP port |
+
+### `chat-ui`
+
+| Variable | Description |
+| --- | --- |
+| `AZURE_OPENAI_RESOURCE_NAME` | Azure OpenAI resource name (not the full URL) |
+| `AZURE_OPENAI_DEPLOYMENT` | Chat model deployment name, e.g. `gpt-4o` |
+| `AZURE_OPENAI_API_VERSION` | API version, e.g. `2024-10-21` |
+| `AZURE_OPENAI_API_KEY` | API key (a Container Apps secret in Azure) |
+| `MCP_LOCAL_CODER_URL` | `mcp-local-coder` `/mcp` endpoint |
+| `MCP_AZLENS_URL` | `AzLens-mcp` `/mcp` endpoint |
+| `MCP_PERSONAL_ASSISTANT_URL` | `mcp-personal-assistant` `/mcp` endpoint |
+
+---
+
+## Deploy to Azure
+
+The pipeline deploys **automatically on every push to `main`**, and can also be run manually — open the **Actions** tab, select **Provision and Deploy MCP Servers**, and click **Run workflow** (manual runs let you override the resource group, region, and name prefix):
 
 **[▶ Run the deploy workflow](../../actions/workflows/deploy.yml)**  _(replace with your repo URL)_
 
-The workflow provisions all Azure infrastructure, builds & pushes the three container images to ACR, deploys the container apps, and prints each server's HTTPS endpoint in the run summary.
+Either trigger provisions the infrastructure, builds & pushes all four container images to ACR, deploys the apps, and prints each endpoint in the run summary.
 
-> A portal-based "Deploy to Azure" button is intentionally not used: these servers are container images that must be built and pushed to a registry, which the GitHub Actions pipeline handles end-to-end.
+> A portal "Deploy to Azure" button is intentionally not used: these are container images that must be built and pushed to a registry, which the pipeline handles end-to-end.
 
----
+### Step 1 — One-time Azure setup (OIDC)
 
-## One-time Azure setup
-
-The workflow authenticates with **OIDC federation** (no client secrets stored in GitHub). Run these once, replacing `<subscription-id>` and `<owner>/<repo>`:
+The workflow logs in with **OIDC federation** — no client secrets stored in GitHub. Run once, replacing `<subscription-id>` and `<owner>/<repo>`:
 
 ```bash
-# 1. Create an Entra app registration for the pipeline
+# 1. App registration for the pipeline
 appId=$(az ad app create --display-name "mcp-deploy" --query appId -o tsv)
 az ad sp create --id "$appId"
 
-# 2. Grant it Owner on the subscription (Owner is required because the Bicep
-#    creates an AcrPull role assignment; Contributor alone cannot do that).
+# 2. Grant Owner on the subscription (Owner is required because the Bicep
+#    creates an AcrPull role assignment; Contributor cannot do that).
 az role assignment create --assignee "$appId" --role "Owner" \
   --scope "/subscriptions/<subscription-id>"
 
-# 3. Add a federated credential for the main branch
+# 3. Federated credential for the main branch
 az ad app federated-credential create --id "$appId" --parameters '{
   "name": "github-main",
   "issuer": "https://token.actions.githubusercontent.com",
@@ -51,7 +278,7 @@ az ad app federated-credential create --id "$appId" --parameters '{
 echo "AZURE_CLIENT_ID = $appId"
 ```
 
-Then add these **repository secrets** (Settings → Secrets and variables → Actions):
+Add these **repository secrets** (Settings → Secrets and variables → Actions):
 
 | Secret | Value |
 | --- | --- |
@@ -59,11 +286,48 @@ Then add these **repository secrets** (Settings → Secrets and variables → Ac
 | `AZURE_TENANT_ID` | `az account show --query tenantId -o tsv` |
 | `AZURE_SUBSCRIPTION_ID` | your subscription ID |
 
-> The workflow runs on the `main` branch by default. If you run it from another branch, add a matching federated credential (`...:ref:refs/heads/<branch>`).
+> If you run the workflow from a branch other than `main`, add a matching federated credential (`...:ref:refs/heads/<branch>`).
 
-### AzLens permissions (after first deploy)
+### Step 2 — chat-ui secrets (Azure OpenAI + Entra)
 
-`AzLens-mcp` uses the deployed managed identity. Grant it read access to the resources it queries:
+Add these repository secrets so the pipeline can configure the front end. Leave the `ENTRA_*` pair empty to deploy chat-ui **without** sign-in.
+
+| Secret | Value |
+| --- | --- |
+| `AZURE_OPENAI_RESOURCE_NAME` | Azure OpenAI resource name (not the URL) |
+| `AZURE_OPENAI_DEPLOYMENT` | chat model deployment, e.g. `gpt-4o` |
+| `AZURE_OPENAI_API_KEY` | key from the Azure OpenAI resource |
+| `ENTRA_CLIENT_ID` | Entra app (client) ID that protects chat-ui |
+| `ENTRA_CLIENT_SECRET` | client secret for that Entra app |
+
+Create the Entra app that fronts chat-ui **after** the first deploy (so you know the chat-ui URL):
+
+```bash
+chatUrl=<chatUiUrl from deployment outputs>   # https://chat-ui.<region>.azurecontainerapps.io
+appId=$(az ad app create --display-name "mcp-chat-ui" \
+  --web-redirect-uris "$chatUrl/.auth/login/aad/callback" \
+  --query appId -o tsv)
+secret=$(az ad app credential reset --id "$appId" --query password -o tsv)
+echo "ENTRA_CLIENT_ID = $appId"
+echo "ENTRA_CLIENT_SECRET = $secret"
+```
+
+Add the two values as secrets and re-run the workflow to turn on Easy Auth.
+
+### Step 3 — Run the deployment
+
+Push to `main` (or click **Run workflow**). The pipeline:
+
+1. logs in via OIDC,
+2. creates the resource group,
+3. deploys `infra/main.bicep` (`mcp-infra`) to create ACR + environment + identity,
+4. builds and pushes the four images with `az acr build`,
+5. redeploys (`mcp-apps`) with the real image tags,
+6. prints the `chat-ui`, `mcp-local-coder`, `AzLens-mcp`, and `mcp-personal-assistant` URLs in the run summary.
+
+### Step 4 — Post-deploy configuration
+
+**AzLens permissions** — grant the managed identity read access to what it queries:
 
 ```bash
 clientId=<managedIdentityClientId from deployment outputs>
@@ -73,20 +337,7 @@ az role assignment create --assignee "$clientId" --role "Log Analytics Reader" \
   --scope "<log-analytics-workspace-resource-id>"
 ```
 
----
-
-## Local development
-
-Node.js 18+ required. In each server folder:
-
-```bash
-npm install
-npm run build
-npm start          # stdio transport (local MCP clients)
-npm run start:http # Streamable HTTP transport (port 3000)
-```
-
-For local MCP clients, see [claude_desktop_config.json](claude_desktop_config.json) — replace the placeholder absolute paths with your own.
+**Easy Auth** — once `ENTRA_CLIENT_ID` / `ENTRA_CLIENT_SECRET` are set and the workflow re-runs, visiting the chat-ui URL redirects to Microsoft sign-in.
 
 ---
 
@@ -95,11 +346,52 @@ For local MCP clients, see [claude_desktop_config.json](claude_desktop_config.js
 ```bash
 az group create -n rg-mcp -l eastus
 az deployment group create -g rg-mcp -f infra/main.bicep -p infra/main.parameters.json
-# then: az acr build ... for each image, and redeploy with the real image params
+
+# build & push images, then redeploy with the real tags
+acr=$(az deployment group show -g rg-mcp -n main --query properties.outputs.acrName.value -o tsv)
+for app in mcp-local-coder:mcp-local-coder azlens-mcp:AzLens-mcp \
+           mcp-personal-assistant:mcp-personal-assistant chat-ui:chat-ui; do
+  img="${app%%:*}"; dir="${app##*:}"
+  az acr build -r "$acr" -t "$img:latest" "./$dir"
+done
 ```
 
-## Notes
+Then re-run `az deployment group create` passing the `*Image` parameters (see the workflow for the exact list).
 
-- HTTP session state is in-memory per replica. For `maxReplicas > 1`, add session affinity or externalize sessions (e.g. Redis).
-- `mcp-local-coder` and `mcp-personal-assistant` write to the container's ephemeral disk. Mount an Azure Files volume for persistence.
-- Run `npm install` in each server once and commit the resulting `package-lock.json`, then switch the Dockerfiles to `npm ci` for reproducible builds.
+---
+
+## Tools reference
+
+| Server | Tool | Parameters | Description |
+| --- | --- | --- | --- |
+| mcp-local-coder | `read_file` | `path` | Read a file inside `WORKSPACE_ROOT` |
+| mcp-local-coder | `write_file` | `path`, `content` | Create/overwrite a file (dirs auto-created) |
+| mcp-local-coder | `search_code` | `query` | Recursive case-insensitive text search |
+| AzLens-mcp | `query_azure_resource` | `resourceId` | Fetch an ARM resource by ID |
+| AzLens-mcp | `run_kql_query` | `workspaceId?`, `query` | Run a KQL query against Log Analytics |
+| AzLens-mcp | `search_wiki` | `query` | Search docs/wiki (stub — wire to your backend) |
+| mcp-personal-assistant | `get_daily_notes` | `date` (YYYY-MM-DD) | Read that day's markdown notes |
+| mcp-personal-assistant | `update_todo_list` | `task`, `status` | Add/update a task (`todo`/`in-progress`/`done`) |
+
+---
+
+## Operations & hardening
+
+- **Session state is in-memory per replica.** For `maxReplicas > 1`, enable session affinity or externalize sessions (e.g. Redis); otherwise a client's follow-up request may hit a replica that doesn't know the session.
+- **Ephemeral storage.** `mcp-local-coder` (`/app/workspace`) and `mcp-personal-assistant` (`/app/notes`) write to the container's ephemeral disk. Mount an Azure Files volume for persistence.
+- **MCP servers are publicly reachable.** Only `chat-ui` is behind Easy Auth. To restrict the MCP servers to the chat UI, switch their ingress to `internal` in the Bicep and use internal FQDNs.
+- **Reproducible builds.** Run `npm install` in each project once, commit the `package-lock.json`, then switch the Dockerfiles from `npm install` to `npm ci`.
+- **Least privilege.** Scope `WORKSPACE_ROOT` narrowly and grant `AzLens-mcp` only the RBAC roles it needs.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely cause / fix |
+| --- | --- |
+| Workflow fails at Azure login | Federated credential subject doesn't match the branch, or missing repo secrets |
+| Deployment fails creating a role assignment | The pipeline identity needs **Owner** (or User Access Administrator) on the scope |
+| chat-ui returns 500 on send | Missing/incorrect `AZURE_OPENAI_*` values, or the model deployment name is wrong |
+| chat-ui shows no tools | An `MCP_*_URL` is unreachable or not ending in `/mcp` |
+| `AzLens-mcp` tool errors with auth | Managed identity lacks Reader / Log Analytics Reader (see Step 4) |
+| `az acr build` fails | Pipeline identity lacks push rights; Owner on the RG covers this |

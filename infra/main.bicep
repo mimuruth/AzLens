@@ -38,6 +38,31 @@ param azLensSubscriptionId string = subscription().subscriptionId
 @description('Optional Log Analytics workspace (customer) ID used by AzLens-mcp run_kql_query.')
 param azLensLogAnalyticsCustomerId string = ''
 
+// --- chat-ui (ChatGPT-style front end) ---------------------------------------
+
+@description('Container image for the chat-ui front end.')
+param chatUiImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+
+@description('Azure OpenAI resource name (not the full URL).')
+param azureOpenAiResourceName string = ''
+
+@description('Azure OpenAI chat model deployment name.')
+param azureOpenAiDeployment string = 'gpt-4o'
+
+@description('Azure OpenAI API version.')
+param azureOpenAiApiVersion string = '2024-10-21'
+
+@description('Azure OpenAI API key. Stored as a Container Apps secret.')
+@secure()
+param azureOpenAiApiKey string = ''
+
+@description('Entra application (client) ID that protects chat-ui with Easy Auth. Leave empty to disable auth.')
+param entraClientId string = ''
+
+@description('Entra client secret for Easy Auth. Stored as a Container Apps secret.')
+@secure()
+param entraClientSecret string = ''
+
 var uniqueSuffix = uniqueString(resourceGroup().id)
 var acrName = toLower('${namePrefix}acr${uniqueSuffix}')
 var logAnalyticsName = '${namePrefix}-logs-${uniqueSuffix}'
@@ -202,6 +227,158 @@ module personalAssistant 'container-app.bicep' = {
 }
 
 // ---------------------------------------------------------------------------
+// chat-ui — ChatGPT-style front end (Azure OpenAI + MCP client).
+// Declared inline (not via the shared module) because it needs secrets and,
+// optionally, Easy Auth.
+// ---------------------------------------------------------------------------
+var enableAuth = !empty(entraClientId)
+
+resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
+  name: 'chat-ui'
+  location: location
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${identity.id}': {}
+    }
+  }
+  properties: {
+    managedEnvironmentId: environment.id
+    configuration: {
+      activeRevisionsMode: 'Single'
+      ingress: {
+        external: true
+        targetPort: targetPort
+        transport: 'auto'
+        allowInsecure: false
+        traffic: [
+          {
+            latestRevision: true
+            weight: 100
+          }
+        ]
+      }
+      registries: [
+        {
+          server: acr.properties.loginServer
+          identity: identity.id
+        }
+      ]
+      secrets: concat(
+        [
+          {
+            name: 'azure-openai-api-key'
+            value: azureOpenAiApiKey
+          }
+        ],
+        enableAuth
+          ? [
+              {
+                name: 'aad-client-secret'
+                value: entraClientSecret
+              }
+            ]
+          : []
+      )
+    }
+    template: {
+      containers: [
+        {
+          name: 'chat-ui'
+          image: chatUiImage
+          resources: {
+            cpu: json('0.5')
+            memory: '1Gi'
+          }
+          env: [
+            {
+              name: 'PORT'
+              value: string(targetPort)
+            }
+            {
+              name: 'AZURE_OPENAI_RESOURCE_NAME'
+              value: azureOpenAiResourceName
+            }
+            {
+              name: 'AZURE_OPENAI_DEPLOYMENT'
+              value: azureOpenAiDeployment
+            }
+            {
+              name: 'AZURE_OPENAI_API_VERSION'
+              value: azureOpenAiApiVersion
+            }
+            {
+              name: 'AZURE_OPENAI_API_KEY'
+              secretRef: 'azure-openai-api-key'
+            }
+            {
+              name: 'MCP_LOCAL_CODER_URL'
+              value: '${localCoder.outputs.fqdn}/mcp'
+            }
+            {
+              name: 'MCP_AZLENS_URL'
+              value: '${azLens.outputs.fqdn}/mcp'
+            }
+            {
+              name: 'MCP_PERSONAL_ASSISTANT_URL'
+              value: '${personalAssistant.outputs.fqdn}/mcp'
+            }
+          ]
+          probes: [
+            {
+              type: 'Liveness'
+              httpGet: {
+                path: '/'
+                port: targetPort
+              }
+              initialDelaySeconds: 10
+              periodSeconds: 30
+            }
+          ]
+        }
+      ]
+      scale: {
+        minReplicas: 1
+        maxReplicas: 3
+      }
+    }
+  }
+  dependsOn: [
+    acrPull
+  ]
+}
+
+// Optional Easy Auth: protects chat-ui behind Microsoft Entra sign-in.
+resource chatUiAuth 'Microsoft.App/containerApps/authConfigs@2024-03-01' = if (enableAuth) {
+  parent: chatUi
+  name: 'current'
+  properties: {
+    platform: {
+      enabled: true
+    }
+    globalValidation: {
+      unauthenticatedClientAction: 'RedirectToLoginPage'
+      redirectToProvider: 'azureactivedirectory'
+    }
+    identityProviders: {
+      azureActiveDirectory: {
+        enabled: true
+        registration: {
+          clientId: entraClientId
+          openIdIssuer: '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
+          clientSecretSettingName: 'aad-client-secret'
+        }
+        validation: {
+          allowedAudiences: [
+            'api://${entraClientId}'
+          ]
+        }
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Outputs
 // ---------------------------------------------------------------------------
 output acrLoginServer string = acr.properties.loginServer
@@ -211,3 +388,4 @@ output managedIdentityPrincipalId string = identity.properties.principalId
 output localCoderUrl string = localCoder.outputs.fqdn
 output azLensUrl string = azLens.outputs.fqdn
 output personalAssistantUrl string = personalAssistant.outputs.fqdn
+output chatUiUrl string = 'https://${chatUi.properties.configuration.ingress.fqdn}'
