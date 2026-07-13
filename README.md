@@ -28,6 +28,12 @@ Each MCP server ships **two transports** from a single codebase:
 - **stdio** (`build/index.js`) — for locally-spawned clients (Claude Desktop, VS Code).
 - **Streamable HTTP** (`build/http.js`) — for remote hosting on Azure Container Apps.
 
+## Chat UI
+
+A modern, claude.ai-style front end with a collapsible sidebar, **New chat**, search, and multiple conversations you can switch between (persisted in the browser). Each conversation streams responses from Azure OpenAI and can call the MCP tools.
+
+![AzLens chat UI showing the multi-chat sidebar with two saved conversations, alongside an open chat](docs/chat-ui-multichat.png)
+
 ---
 
 ## Table of contents
@@ -36,6 +42,7 @@ Each MCP server ships **two transports** from a single codebase:
 - [Repository layout](#repository-layout)
 - [Prerequisites](#prerequisites)
 - [Quick start (local)](#quick-start-local)
+- [Running & testing locally (step by step)](#running--testing-locally-step-by-step)
 - [Configuration reference](#configuration-reference)
 - [Deploy to Azure](#deploy-to-azure)
   - [One-time setup](#step-1--one-time-azure-setup-oidc)
@@ -197,6 +204,76 @@ cp .env.example .env.local   # fill in Azure OpenAI + the MCP_*_URL values above
 npm install
 npm run dev                  # http://localhost:3000
 ```
+
+---
+
+## Running & testing locally (step by step)
+
+These steps assume **Node.js 18+** is installed. Ordered fastest → most involved.
+
+### Step 1 — Automated smoke test (fastest)
+
+Spawns each server over stdio, lists its tools, and runs safe round-trips. Builds each server on first run.
+
+```bash
+npm install          # once, at the repo root
+npm run smoke
+```
+
+Expected: `8/8 checks passed. Smoke test PASSED.` Use `SKIP_BUILD=1 npm run smoke` to skip rebuilds.
+
+### Step 2 — Interactive tool testing (MCP Inspector)
+
+The [MCP Inspector](https://github.com/modelcontextprotocol/inspector) is a browser UI to call tools by hand — no LLM required. Best for exploring a single server.
+
+```bash
+cd mcp-local-coder
+npm install && npm run build
+npx @modelcontextprotocol/inspector node build/index.js
+```
+
+Open the printed `http://localhost:6274` URL, click **Connect** → **List Tools**, and invoke `read_file` / `write_file` / `search_code`. Repeat for the other servers:
+
+- `mcp-personal-assistant` — works offline; try `update_todo_list` then `get_daily_notes`.
+- `AzLens-mcp` — `search_wiki` works offline; `query_azure_resource` / `run_kql_query` need `az login` and `AZURE_SUBSCRIPTION_ID` set.
+
+Press Ctrl+C to stop.
+
+### Step 3 — HTTP transport (what Azure runs)
+
+```bash
+cd mcp-local-coder
+PORT=3001 npm run start:http
+# in another terminal:
+curl http://localhost:3001/health     # -> {"status":"ok"}
+```
+
+You can also point the Inspector at `http://localhost:3001/mcp` using the **Streamable HTTP** transport.
+
+### Step 4 — Full end-to-end (chat UI)
+
+Requires an **Azure OpenAI** resource + chat model deployment. Run the three servers on distinct ports, then the UI:
+
+```bash
+# three terminals
+cd mcp-local-coder        && PORT=3001 npm run start:http
+cd AzLens-mcp             && PORT=3002 npm run start:http
+cd mcp-personal-assistant && PORT=3003 npm run start:http
+
+# fourth terminal
+cd chat-ui
+cp .env.example .env.local   # set AZURE_OPENAI_* and MCP_*_URL to :3001/3002/3003
+npm install
+npm run dev                  # http://localhost:3000
+```
+
+Open http://localhost:3000 and try: *"read the file package.json"*, *"add 'ship v1' to my to-do list"*. Tool-call badges appear when a server is used. Easy Auth is an Azure-only feature, so the local UI is open — expected.
+
+### Step 5 — Use from a local MCP client (stdio)
+
+Point Claude Desktop / VS Code at [claude_desktop_config.json](claude_desktop_config.json), replacing the placeholder paths with your absolute `build/index.js` paths, then restart the client.
+
+> **Recommended order:** Step 1 to confirm health, Step 2 to poke individual tools, then Step 4 once you have Azure OpenAI details.
 
 ---
 

@@ -1,16 +1,10 @@
-import { createAzure } from "@ai-sdk/azure";
-import { streamText } from "ai";
+import { streamText, convertToCoreMessages } from "ai";
 import { getMcpTools } from "@/lib/mcp";
+import { getModel } from "@/lib/model";
 
 // The MCP client uses Node APIs, so this route must run on the Node.js runtime.
 export const runtime = "nodejs";
 export const maxDuration = 60;
-
-const azure = createAzure({
-  resourceName: process.env.AZURE_OPENAI_RESOURCE_NAME ?? "",
-  apiKey: process.env.AZURE_OPENAI_API_KEY ?? "",
-  apiVersion: process.env.AZURE_OPENAI_API_VERSION ?? "2024-10-21",
-});
 
 const SYSTEM_PROMPT = [
   "You are a helpful assistant with access to tools exposed by three MCP servers:",
@@ -26,9 +20,9 @@ export async function POST(req: Request) {
   const { tools, close } = await getMcpTools();
 
   const result = streamText({
-    model: azure(process.env.AZURE_OPENAI_DEPLOYMENT ?? "gpt-4o"),
+    model: getModel(),
     system: SYSTEM_PROMPT,
-    messages,
+    messages: convertToCoreMessages(messages),
     tools,
     // Allow the model to call tools and then continue reasoning with the result.
     maxSteps: 5,
@@ -38,5 +32,9 @@ export async function POST(req: Request) {
     },
   });
 
-  return result.toDataStreamResponse();
+  // Surface the real error text to the browser to make local debugging easier.
+  return result.toDataStreamResponse({
+    getErrorMessage: (error) =>
+      error instanceof Error ? error.message : String(error),
+  });
 }

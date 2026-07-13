@@ -18,13 +18,21 @@ const SERVER_URLS = [
  * connections once the response has finished streaming.
  */
 export async function getMcpTools() {
-  const clients = await Promise.all(
-    SERVER_URLS.map((url) =>
-      experimental_createMCPClient({
-        transport: new StreamableHTTPClientTransport(new URL(url)),
-      })
-    )
-  );
+  type McpClient = Awaited<ReturnType<typeof experimental_createMCPClient>>;
+  const clients: McpClient[] = [];
+  for (const url of SERVER_URLS) {
+    try {
+      clients.push(
+        await experimental_createMCPClient({
+          transport: new StreamableHTTPClientTransport(new URL(url)),
+        })
+      );
+    } catch (error) {
+      // A missing/unreachable MCP server should not break the chat — the model
+      // simply won't have that server's tools available.
+      console.warn(`MCP: could not connect to ${url}:`, error);
+    }
+  }
 
   const toolSets = await Promise.all(clients.map((client) => client.tools()));
 
