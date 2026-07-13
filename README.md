@@ -463,9 +463,19 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 - Auto-growing composer — **Enter** sends, **Shift+Enter** inserts a newline.
 - Tool calls are shown inline as chips (e.g. `used search_wiki`).
 
-**Models**
+**Models & routing**
 
 - A **model picker** in the top bar lists only the providers configured on the server (Azure OpenAI / OpenAI / Anthropic / Local). The choice persists and is sent per message. A local OpenAI-compatible server (LM Studio, Ollama, vLLM) appears as **Local** when `LOCAL_OPENAI_BASE_URL` is set, with its loaded models discovered automatically.
+- **Auto (route by complexity)** — the default option. A zero-cost heuristic scores each prompt and routes **simple** requests to a cheap/fast model and **complex** ones (code, multi-step reasoning, long or multi-part prompts) to the most capable model available. With a local model configured, simple prompts prefer the free **Local** model and complex prompts go to the best cloud model. The chosen agent, model, and tier are shown as a small badge above each answer. Override the picks with `AUTO_SIMPLE` / `AUTO_COMPLEX` (`provider:model`).
+
+**Agents**
+
+- An **agent picker** in the top bar switches between focused personas, each with a tailored system prompt and scoped to a subset of MCP servers:
+  - **General** — all tools across every server.
+  - **Code Assistant** — `mcp-local-coder` only (read/write/search code).
+  - **Azure Expert** — `AzLens-mcp` only (resource queries, KQL, docs).
+  - **Personal Assistant** — `mcp-personal-assistant` only (notes & to-dos).
+- Add or edit agents in [chat-ui/lib/agents.ts](chat-ui/lib/agents.ts).
 
 **MCP tools panel**
 
@@ -481,11 +491,11 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 
 **API routes (Next.js route handlers)**
 
-| Route                 | Purpose                                                                                                                                                 |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/chat`      | Streams a completion; connects to the MCP servers as a client and exposes their tools to the model. Accepts an optional `{ provider, model }` override. |
-| `GET /api/models`     | Providers/models available, based on which API keys are configured on the server.                                                                       |
-| `GET /api/mcp/health` | Server-side health check of each MCP server (avoids browser CORS).                                                                                      |
+| Route                 | Purpose                                                                                                                                                                                                                                                           |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/chat`      | Streams a completion; connects to the MCP servers as a client and exposes their tools to the model. Accepts an optional `{ provider, model, agentId }`. Resolves the agent (system prompt + server scope) and, for `provider: "auto"`, routes by task complexity. |
+| `GET /api/models`     | Providers/models available, based on which API keys are configured on the server.                                                                                                                                                                                 |
+| `GET /api/mcp/health` | Server-side health check of each MCP server (avoids browser CORS).                                                                                                                                                                                                |
 
 > `search_wiki` is implemented against **Microsoft Learn** and is extensible to internal wikis (e.g. an Azure DevOps project wiki) — see [AzLens-mcp/src/wiki.ts](AzLens-mcp/src/wiki.ts).
 

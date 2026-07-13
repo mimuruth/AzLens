@@ -10,13 +10,24 @@ import {
   type ModelProvider,
   type ModelSelection,
 } from "@/lib/storage";
+import { AGENTS } from "@/lib/agents";
 import Logo from "@/components/Logo";
+
+type RouteAnnotation = {
+  agentName?: string;
+  provider?: string;
+  model?: string;
+  routed?: boolean;
+  tier?: string;
+};
 
 export default function ChatArea({
   id,
   providers,
   modelSelection,
   onSelectModel,
+  agentId,
+  onSelectAgent,
   prefill,
   onMessages,
   onToggleSidebar,
@@ -25,6 +36,8 @@ export default function ChatArea({
   providers: ModelProvider[];
   modelSelection: ModelSelection | null;
   onSelectModel: (sel: ModelSelection) => void;
+  agentId: string;
+  onSelectAgent: (id: string) => void;
   prefill: { text: string; nonce: number } | null;
   onMessages: (id: string, messages: UIMessage[]) => void;
   onToggleSidebar: () => void;
@@ -101,12 +114,12 @@ export default function ChatArea({
       attachments.forEach((file) => dt.items.add(file));
       options.experimental_attachments = dt.files;
     }
-    if (modelSelection) {
-      options.body = {
-        provider: modelSelection.provider,
-        model: modelSelection.model,
-      };
-    }
+    options.body = {
+      agentId,
+      ...(modelSelection
+        ? { provider: modelSelection.provider, model: modelSelection.model }
+        : {}),
+    };
 
     handleSubmit(e, options);
     setAttachments([]);
@@ -114,6 +127,13 @@ export default function ChatArea({
   }
 
   const isEmpty = messages.length === 0;
+
+  function routeInfo(annotations: unknown): RouteAnnotation | null {
+    if (!Array.isArray(annotations) || annotations.length === 0) return null;
+    const a = annotations[annotations.length - 1] as RouteAnnotation;
+    if (!a || (!a.model && !a.agentName)) return null;
+    return a;
+  }
 
   return (
     <div className="app">
@@ -137,6 +157,18 @@ export default function ChatArea({
           </svg>
         </button>
         <span className="topbar-title">AzLens</span>
+        <select
+          className="agent-picker"
+          value={agentId}
+          onChange={(e) => onSelectAgent(e.target.value)}
+          title="Agent"
+        >
+          {AGENTS.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.glyph} {a.name}
+            </option>
+          ))}
+        </select>
         {providers.length > 0 && modelSelection && (
           <select
             className="model-picker"
@@ -176,6 +208,26 @@ export default function ChatArea({
                   <Logo size={28} className="avatar-logo" />
                 )}
                 <div className="content">
+                  {message.role === "assistant" &&
+                    (() => {
+                      const info = routeInfo(message.annotations);
+                      if (!info) return null;
+                      return (
+                        <div className="route-badge">
+                          {info.agentName && (
+                            <span className="rb-agent">{info.agentName}</span>
+                          )}
+                          {info.model && (
+                            <span className="rb-model">{info.model}</span>
+                          )}
+                          {info.routed && info.tier && (
+                            <span className={`rb-tier ${info.tier}`}>
+                              {info.tier}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   {message.experimental_attachments?.map((att, i) =>
                     att.contentType?.startsWith("image/") ? (
                       // eslint-disable-next-line @next/next/no-img-element

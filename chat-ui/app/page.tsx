@@ -21,8 +21,11 @@ import {
   saveTheme,
   loadModel,
   saveModel,
+  loadAgentId,
+  saveAgentId,
   newId,
 } from "@/lib/storage";
+import { DEFAULT_AGENT_ID } from "@/lib/agents";
 import {
   downloadFile,
   exportChatMarkdown,
@@ -38,9 +41,11 @@ export default function Page() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [providers, setProviders] = useState<ModelProvider[]>([]);
   const [modelSel, setModelSel] = useState<ModelSelection | null>(null);
-  const [prefill, setPrefill] = useState<{ text: string; nonce: number } | null>(
-    null
-  );
+  const [agentId, setAgentId] = useState<string>(DEFAULT_AGENT_ID);
+  const [prefill, setPrefill] = useState<{
+    text: string;
+    nonce: number;
+  } | null>(null);
   const [ready, setReady] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -59,6 +64,7 @@ export default function Page() {
     const t = loadTheme();
     document.documentElement.setAttribute("data-theme", t);
     setTheme(t);
+    setAgentId(loadAgentId() ?? DEFAULT_AGENT_ID);
     setConversations(list);
     setActiveId(active);
     setReady(true);
@@ -192,6 +198,11 @@ export default function Page() {
     saveModel(sel);
   }, []);
 
+  const changeAgent = useCallback((id: string) => {
+    setAgentId(id);
+    saveAgentId(id);
+  }, []);
+
   const useTool = useCallback((text: string) => {
     setPrefill({ text, nonce: Date.now() });
   }, []);
@@ -199,8 +210,10 @@ export default function Page() {
   const exportChat = useCallback(() => {
     const convo = conversations.find((c) => c.id === activeId);
     if (!convo) return;
-    const name =
-      (convo.title.replace(/[^\w\- ]+/g, "").trim() || "chat").slice(0, 40);
+    const name = (convo.title.replace(/[^\w\- ]+/g, "").trim() || "chat").slice(
+      0,
+      40
+    );
     downloadFile(`${name}.md`, exportChatMarkdown(convo), "text/markdown");
   }, [conversations, activeId]);
 
@@ -281,6 +294,8 @@ export default function Page() {
         providers={providers}
         modelSelection={modelSel}
         onSelectModel={changeModel}
+        agentId={agentId}
+        onSelectAgent={changeAgent}
         prefill={prefill}
         onMessages={handleMessages}
         onToggleSidebar={() => setCollapsed((v) => !v)}

@@ -91,6 +91,16 @@ export function saveModel(sel: ModelSelection): void {
   if (hasWindow()) localStorage.setItem(MODEL_KEY, JSON.stringify(sel));
 }
 
+const AGENT_KEY = "azlens.agent";
+
+export function loadAgentId(): string | null {
+  return hasWindow() ? localStorage.getItem(AGENT_KEY) : null;
+}
+
+export function saveAgentId(id: string): void {
+  if (hasWindow()) localStorage.setItem(AGENT_KEY, id);
+}
+
 /** Group conversations (already sorted newest-first) into date buckets. */
 export function groupByDate(
   list: Conversation[]

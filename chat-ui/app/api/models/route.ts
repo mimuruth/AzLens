@@ -65,5 +65,16 @@ export async function GET(): Promise<Response> {
     });
   }
 
+  // Prepend an "Auto" option that routes by task complexity (cheap model for
+  // simple prompts, powerful model for complex ones). Only useful when at least
+  // one real provider is configured.
+  if (providers.length > 0) {
+    providers.unshift({
+      id: "auto",
+      label: "Auto",
+      models: ["route by complexity"],
+    });
+  }
+
   return Response.json(providers);
 }

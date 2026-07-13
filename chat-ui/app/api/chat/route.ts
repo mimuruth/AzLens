@@ -1,40 +1,68 @@
-import { streamText, convertToCoreMessages } from "ai";
+import {
+  streamText,
+  convertToCoreMessages,
+  createDataStreamResponse,
+  type CoreMessage,
+} from "ai";
 import { getMcpTools } from "@/lib/mcp";
 import { getModel } from "@/lib/model";
+import { getAgent } from "@/lib/agents";
+import { resolveAutoModel, lastUserText } from "@/lib/router";
 
 // The MCP client uses Node APIs, so this route must run on the Node.js runtime.
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const SYSTEM_PROMPT = [
-  "You are a helpful assistant with access to tools exposed by three MCP servers:",
-  "- mcp-local-coder: read/write files and search code.",
-  "- AzLens-mcp: query Azure resources, run KQL log queries, and search the wiki.",
-  "- mcp-personal-assistant: read daily notes and update a to-do list.",
-  "Use the tools when they help answer the user. Explain what you did concisely.",
-].join("\n");
-
 export async function POST(req: Request) {
-  const { messages, provider, model } = await req.json();
+  const { messages, provider, model, agentId } = await req.json();
 
-  const { tools, close } = await getMcpTools();
+  const agent = getAgent(agentId);
+  const coreMessages = convertToCoreMessages(messages);
 
-  const result = streamText({
-    model: getModel({ provider, model }),
-    system: SYSTEM_PROMPT,
-    messages: convertToCoreMessages(messages),
-    tools,
-    // Allow the model to call tools and then continue reasoning with the result.
-    maxSteps: 5,
-    // Close the MCP connections once the full response has been produced.
-    onFinish: async () => {
-      await close();
+  // Decide the model. An explicit picker choice wins; "auto" (or no choice)
+  // routes by task complexity across whatever providers are configured.
+  let chosen: { provider?: string; model?: string } = { provider, model };
+  let routed: { tier: string; reason: string } | null = null;
+  if (!provider || provider === "auto" || model === "auto") {
+    const decision = resolveAutoModel(
+      lastUserText(coreMessages as CoreMessage[])
+    );
+    chosen = { provider: decision.provider, model: decision.model };
+    routed = { tier: decision.tier, reason: decision.reason };
+  }
+
+  const { tools, close } = await getMcpTools(agent.servers);
+
+  return createDataStreamResponse({
+    execute: (dataStream) => {
+      // Tell the UI which agent/model handled this turn (shown as a badge).
+      dataStream.writeMessageAnnotation({
+        agent: agent.id,
+        agentName: agent.name,
+        provider: chosen.provider ?? "",
+        model: chosen.model ?? "",
+        ...(routed
+          ? { routed: true, tier: routed.tier, reason: routed.reason }
+          : {}),
+      });
+
+      const result = streamText({
+        model: getModel(chosen),
+        system: agent.systemPrompt,
+        messages: coreMessages,
+        tools,
+        // Allow the model to call tools and then continue reasoning.
+        maxSteps: 5,
+        // Close the MCP connections once the full response has been produced.
+        onFinish: async () => {
+          await close();
+        },
+      });
+
+      result.mergeIntoDataStream(dataStream);
     },
-  });
-
-  // Surface the real error text to the browser to make local debugging easier.
-  return result.toDataStreamResponse({
-    getErrorMessage: (error) =>
+    // Surface the real error text to the browser to make debugging easier.
+    onError: (error) =>
       error instanceof Error ? error.message : String(error),
   });
 }
