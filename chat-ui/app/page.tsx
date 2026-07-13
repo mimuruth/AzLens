@@ -230,26 +230,23 @@ export default function Page() {
   );
 
   // Persist messages and keep the conversation title/order in sync.
-  const handleMessages = useCallback(
-    (id: string, messages: UIMessage[]) => {
-      saveMessages(id, messages);
+  const handleMessages = useCallback((id: string, messages: UIMessage[]) => {
+    saveMessages(id, messages);
+    setConversations((prev) => {
+      const idx = prev.findIndex((c) => c.id === id);
+      if (idx < 0) return prev;
+      const current = prev[idx];
+      if (current.renamed) return prev;
       const nextTitle = titleFromMessages(messages);
-      setConversations((prev) => {
-        const idx = prev.findIndex((c) => c.id === id);
-        if (idx < 0) return prev;
-        const current = prev[idx];
-        const title = current.renamed
-          ? current.title
-          : nextTitle ?? current.title;
-        if (title === current.title && messages.length === 0) return prev;
-        const list = [...prev];
-        list[idx] = { ...current, title, updatedAt: Date.now() };
-        saveConversations(list);
-        return list;
-      });
-    },
-    []
-  );
+      // Only touch state when the derived title actually changes (once, when
+      // the first user message arrives) — never on every streamed token.
+      if (!nextTitle || nextTitle === current.title) return prev;
+      const list = [...prev];
+      list[idx] = { ...current, title: nextTitle, updatedAt: Date.now() };
+      saveConversations(list);
+      return list;
+    });
+  }, []);
 
   if (!ready) return null;
 

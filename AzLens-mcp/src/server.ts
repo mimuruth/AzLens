@@ -14,6 +14,7 @@ import { z } from "zod";
 import { DefaultAzureCredential } from "@azure/identity";
 import { ResourceManagementClient } from "@azure/arm-resources";
 import { LogsQueryClient, LogsQueryResultStatus } from "@azure/monitor-query";
+import { getWikiSources, type WikiResult } from "./wiki.js";
 
 const AZURE_SUBSCRIPTION_ID = process.env.AZURE_SUBSCRIPTION_ID ?? "";
 const DEFAULT_WORKSPACE_ID = process.env.LOG_ANALYTICS_WORKSPACE_ID ?? "";
@@ -23,6 +24,36 @@ const DEFAULT_WORKSPACE_ID = process.env.LOG_ANALYTICS_WORKSPACE_ID ?? "";
  * transparently chains Managed Identity, Azure CLI, environment variables, etc.
  */
 const credential = new DefaultAzureCredential();
+
+/**
+ * Verify the server can authenticate to Azure before calling a live API, so
+ * tools can return a clear hint instead of a raw SDK error.
+ * Returns a human-readable message when NOT ready, or null when good to go.
+ */
+async function checkAzureAuth(scope: string): Promise<string | null> {
+  if (!AZURE_SUBSCRIPTION_ID) {
+    return (
+      "Azure is not configured: set AZURE_SUBSCRIPTION_ID (the subscription to " +
+      "query) in the environment."
+    );
+  }
+  try {
+    const token = await credential.getToken(scope);
+    if (!token) {
+      return (
+        "Not authenticated to Azure. Run `az login` locally, or assign a " +
+        "managed identity when hosted on Azure Container Apps."
+      );
+    }
+    return null;
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    return (
+      "Not authenticated to Azure. Run `az login` locally (or assign a managed " +
+      `identity in Azure), then retry.\n\nDetails: ${detail}`
+    );
+  }
+}
 
 /** Lazily constructed clients so the server can start before `az login`. */
 let resourceClient: ResourceManagementClient | undefined;
@@ -77,6 +108,13 @@ export function createServer(): McpServer {
       },
     },
     async ({ resourceId }) => {
+      const authError = await checkAzureAuth(
+        "https://management.azure.com/.default"
+      );
+      if (authError) {
+        return { content: [{ type: "text", text: authError }], isError: true };
+      }
+
       const client = getResourceClient();
 
       // The ARM API requires an explicit API version per resource type. In a
@@ -114,14 +152,29 @@ export function createServer(): McpServer {
       },
     },
     async ({ workspaceId, query }) => {
-      const client = getLogsClient();
       const targetWorkspace = workspaceId || DEFAULT_WORKSPACE_ID;
 
       if (!targetWorkspace) {
-        throw new Error(
-          "No workspaceId provided and LOG_ANALYTICS_WORKSPACE_ID is not set."
-        );
+        return {
+          content: [
+            {
+              type: "text",
+              text:
+                "No workspaceId provided and LOG_ANALYTICS_WORKSPACE_ID is not set.",
+            },
+          ],
+          isError: true,
+        };
       }
+
+      const authError = await checkAzureAuth(
+        "https://api.loganalytics.io/.default"
+      );
+      if (authError) {
+        return { content: [{ type: "text", text: authError }], isError: true };
+      }
+
+      const client = getLogsClient();
 
       // Query the last 24 hours by default; adjust the timespan as needed.
       const result = await client.queryWorkspace(targetWorkspace, query, {
@@ -129,9 +182,15 @@ export function createServer(): McpServer {
       });
 
       if (result.status !== LogsQueryResultStatus.Success) {
-        throw new Error(
-          `KQL query did not succeed (status: ${result.status}).`
-        );
+        return {
+          content: [
+            {
+              type: "text",
+              text: `KQL query did not succeed (status: ${result.status}).`,
+            },
+          ],
+          isError: true,
+        };
       }
 
       return {
@@ -150,26 +209,50 @@ export function createServer(): McpServer {
     {
       title: "Search Wiki",
       description:
-        "Search internal wiki / documentation for a query and return matching " +
-        "entries. Replace the stub body with your wiki backend (Azure DevOps " +
-        "Wiki, Git repo, Confluence, etc.).",
+        "Search documentation for a query. Backed by Microsoft Learn by default; " +
+        "additional internal wikis (e.g. Azure DevOps) can be enabled via config.",
       inputSchema: {
         query: z.string().min(1).describe("The text to search the wiki for."),
       },
     },
     async ({ query }) => {
-      // TODO: Wire this to your documentation source. Common options:
-      //   - Azure DevOps Wiki REST API
-      //   - A local Git repository of markdown files
-      //   - Azure AI Search index over your docs
-      const placeholder = [
-        `Wiki search stub — received query: "${query}".`,
-        "Implement search_wiki against your documentation backend.",
-      ].join("\n");
+      const sources = getWikiSources();
+      const settled = await Promise.allSettled(
+        sources.map((s) => s.search(query, 6))
+      );
 
-      return {
-        content: [{ type: "text", text: placeholder }],
-      };
+      const results = [] as WikiResult[];
+      const errors: string[] = [];
+      settled.forEach((r, i) => {
+        if (r.status === "fulfilled") results.push(...r.value);
+        else
+          errors.push(
+            `${sources[i].name}: ${
+              r.reason instanceof Error ? r.reason.message : String(r.reason)
+            }`
+          );
+      });
+
+      if (results.length === 0) {
+        const text = errors.length
+          ? `No results for "${query}". Source errors:\n${errors.join("\n")}`
+          : `No wiki results found for "${query}".`;
+        return { content: [{ type: "text", text }], isError: errors.length > 0 };
+      }
+
+      const body = results
+        .map(
+          (r) =>
+            `- ${r.title} [${r.source}]\n  ${r.url}${
+              r.snippet ? `\n  ${r.snippet}` : ""
+            }`
+        )
+        .join("\n\n");
+      const footer = errors.length
+        ? `\n\n(Some sources failed: ${errors.join("; ")})`
+        : "";
+
+      return { content: [{ type: "text", text: body + footer }] };
     }
   );
 
