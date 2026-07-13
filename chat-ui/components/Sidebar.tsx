@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Conversation } from "@/lib/storage";
+import Logo from "@/components/Logo";
 
 export default function Sidebar({
   conversations,
@@ -33,7 +34,7 @@ export default function Sidebar({
       <div className="sidebar-inner">
         <div className="sidebar-head">
           <div className="brand">
-            <span className="logo" aria-hidden />
+            <Logo size={24} />
             <span>AzLens</span>
           </div>
           <button

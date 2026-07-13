@@ -6,6 +6,7 @@ import type { UIMessage } from "ai";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { loadMessages } from "@/lib/storage";
+import Logo from "@/components/Logo";
 
 export default function ChatArea({
   id,
@@ -110,7 +111,7 @@ export default function ChatArea({
       <main className={`conversation ${isEmpty ? "is-empty" : ""}`}>
         {isEmpty ? (
           <div className="greeting">
-            <span className="logo logo-lg" aria-hidden />
+            <Logo size={44} className="greeting-logo" />
             <h1>How can I help you today?</h1>
             <p className="hint">
               Ask me to read a file, query an Azure resource, or update your
@@ -122,7 +123,7 @@ export default function ChatArea({
             {messages.map((message) => (
               <div key={message.id} className={`msg ${message.role}`}>
                 {message.role === "assistant" && (
-                  <span className="avatar" aria-hidden />
+                  <Logo size={28} className="avatar-logo" />
                 )}
                 <div className="content">
                   {message.experimental_attachments?.map((att, i) =>
@@ -168,7 +169,7 @@ export default function ChatArea({
             ))}
             {isBusy && (
               <div className="msg assistant">
-                <span className="avatar" aria-hidden />
+                <Logo size={28} className="avatar-logo" />
                 <div className="content">
                   <span className="typing">
                     <i />
