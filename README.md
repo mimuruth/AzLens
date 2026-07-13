@@ -62,68 +62,15 @@ A modern, claude.ai-style front end with a collapsible sidebar, **New chat**, se
 
 Everything runs in one Container Apps environment. A single user-assigned managed identity pulls images from ACR; `AzLens-mcp` also uses it to query Azure. Only `chat-ui` is exposed to users behind Entra Easy Auth.
 
-```mermaid
-flowchart TB
-    User["User browser"]
-
-    subgraph AZ["Azure resource group"]
-        subgraph ENV["Container Apps environment"]
-            CHAT["chat-ui - Next.js, Easy Auth"]
-            S1["mcp-local-coder"]
-            S2["AzLens-mcp"]
-            S3["mcp-personal-assistant"]
-        end
-        ACR["Azure Container Registry"]
-        MI["User-assigned managed identity"]
-        LOGS["Log Analytics"]
-    end
-
-    AOAI["Azure OpenAI"]
-    ENTRA["Microsoft Entra ID"]
-    ARM["Azure Resource Manager"]
-
-    User -->|HTTPS| CHAT
-    CHAT -->|sign-in| ENTRA
-    CHAT -->|chat completions| AOAI
-    CHAT -->|/mcp| S1
-    CHAT -->|/mcp| S2
-    CHAT -->|/mcp| S3
-    S2 -->|managed identity| ARM
-    MI -->|AcrPull| ACR
-    CHAT -->|logs| LOGS
-    ACR -->|images| CHAT
-```
+![Deployment topology: chat-ui and three MCP servers in one Container Apps environment, with ACR, managed identity, Log Analytics, Azure OpenAI, Entra ID, and Azure Resource Manager](docs/arch-topology.png)
 
 ### Request flow (a single chat turn)
 
-```mermaid
-sequenceDiagram
-    actor U as User
-    participant C as chat-ui
-    participant O as Azure OpenAI
-    participant M as MCP server
-
-    U->>C: prompt
-    C->>O: messages plus available MCP tools
-    O-->>C: tool call e.g. read_file
-    C->>M: JSON-RPC over /mcp
-    M-->>C: tool result
-    C->>O: tool result appended
-    O-->>C: streamed final answer
-    C-->>U: tokens streamed to browser
-```
+![Sequence diagram: user prompt goes to chat-ui, which calls Azure OpenAI, which requests an MCP tool call, chat-ui calls the MCP server over /mcp, and the streamed answer returns to the user](docs/arch-flow.png)
 
 ### CI/CD flow
 
-```mermaid
-flowchart LR
-    A["push to main or Run workflow"] --> B["OIDC login to Azure"]
-    B --> C["az group create"]
-    C --> D["Deploy infra - mcp-infra"]
-    D --> E["az acr build x4"]
-    E --> F["Deploy apps - mcp-apps"]
-    F --> G["Print endpoints in run summary"]
-```
+![CI/CD flow: push to main or run workflow, OIDC login, create resource group, deploy infra, build images, deploy apps, print endpoints](docs/arch-cicd.png)
 
 ---
 
