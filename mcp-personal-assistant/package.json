@@ -16,6 +16,7 @@
     "start": "node build/index.js",
     "start:http": "node build/http.js",
     "dev": "tsc && node build/index.js",
+    "test": "vitest run",
     "clean": "node -e \"import('fs').then(fs => fs.rmSync('build', { recursive: true, force: true }))\""
   },
   "keywords": [
@@ -36,6 +37,7 @@
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^22.9.0",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
   }
 }

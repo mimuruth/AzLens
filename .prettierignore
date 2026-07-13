@@ -1,0 +1,7 @@
+**/node_modules/**
+**/build/**
+**/.next/**
+docs/**
+*.png
+*.svg
+package-lock.json

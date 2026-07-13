@@ -3,11 +3,21 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "MCP multi-server workspace — root dev tooling (smoke tests)",
+  "description": "MCP multi-server workspace — root dev tooling (smoke tests, lint, format)",
   "scripts": {
-    "smoke": "node scripts/smoke-test.mjs"
+    "smoke": "node scripts/smoke-test.mjs",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.0"
+    "@eslint/js": "^9.15.0",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "eslint": "^9.15.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.10",
+    "prettier": "^3.4.1",
+    "typescript-eslint": "^8.16.0"
   }
 }

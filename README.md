@@ -1,6 +1,6 @@
-
 ```html
-<div align="center"><pre>
+<div align="center">
+  <pre>
    █████╗ ███████╗██╗     ███████╗███╗   ██╗███████╗
   ██╔══██╗╚══███╔╝██║     ██╔════╝████╗  ██║██╔════╝
   ███████║  ███╔╝ ██║     █████╗  ██╔██╗ ██║███████╗
@@ -8,20 +8,20 @@
   ██║  ██║███████╗███████╗███████╗██║ ╚████║███████║
   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═══╝╚══════╝
               The context compression layer for AI agents
-</pre></div>
+</pre>
+</div>
 ```
-
 
 # MCP Multi-Server Workspace
 
 **AzLens** is a TypeScript monorepo of three decoupled [Model Context Protocol](https://modelcontextprotocol.io) servers plus a ChatGPT-style web UI, deployable end-to-end to **Azure Container Apps** with a single GitHub Actions workflow.
 
-| Component | Type | Purpose | Tools / Role |
-| --- | --- | --- | --- |
-| `mcp-local-coder` | MCP server | Local file system + code search | `read_file`, `write_file`, `search_code` |
-| `AzLens-mcp` | MCP server | Azure ARM / KQL / Wiki | `query_azure_resource`, `run_kql_query`, `search_wiki` |
-| `mcp-personal-assistant` | MCP server | Notes + to-do lists | `get_daily_notes`, `update_todo_list` |
-| `chat-ui` | Next.js app | ChatGPT-style front end | Azure OpenAI + MCP client over all three servers |
+| Component                | Type        | Purpose                         | Tools / Role                                           |
+| ------------------------ | ----------- | ------------------------------- | ------------------------------------------------------ |
+| `mcp-local-coder`        | MCP server  | Local file system + code search | `read_file`, `write_file`, `search_code`               |
+| `AzLens-mcp`             | MCP server  | Azure ARM / KQL / Wiki          | `query_azure_resource`, `run_kql_query`, `search_wiki` |
+| `mcp-personal-assistant` | MCP server  | Notes + to-do lists             | `get_daily_notes`, `update_todo_list`                  |
+| `chat-ui`                | Next.js app | ChatGPT-style front end         | Azure OpenAI + MCP client over all three servers       |
 
 Each MCP server ships **two transports** from a single codebase:
 
@@ -68,6 +68,7 @@ Collapsing the sidebar leaves a slim **icon rail** (new chat, search, theme):
 - [Tools reference](#tools-reference)
 - [Chat UI functionality](#chat-ui-functionality)
 - [How it works](#how-it-works)
+- [Tooling & quality](#tooling--quality)
 - [Operations & hardening](#operations--hardening)
 - [Troubleshooting](#troubleshooting)
 
@@ -88,6 +89,32 @@ Everything runs in one Container Apps environment. A single user-assigned manage
 ### CI/CD flow
 
 ![CI/CD flow: push to main or run workflow, OIDC login, create resource group, deploy infra, build images, deploy apps, print endpoints](docs/arch-cicd.png)
+
+### Identity & authentication
+
+Four distinct mechanisms: Easy Auth (users → chat-ui), API keys (chat-ui → model), `DefaultAzureCredential` + managed identity (AzLens → Azure), and OIDC federation (GitHub → Azure).
+
+![Identity diagram showing Easy Auth, provider API keys, managed identity with Reader/Log Analytics Reader/AcrPull, and GitHub OIDC federation](docs/arch-identity.png)
+
+### Network & security boundaries
+
+Only `chat-ui` is publicly exposed (behind Easy Auth); it fans out to the MCP servers and egresses to Azure OpenAI, ARM/Log Analytics, and Microsoft Learn.
+
+![Network boundary diagram: users reach chat-ui over the internet; chat-ui calls the three MCP servers; egress to Azure OpenAI, ARM/Log Analytics, and Microsoft Learn; ACR image pull via managed identity](docs/arch-network.png)
+
+### Component / module map
+
+Each MCP server's logic lives once in `server.ts` and is reused by the stdio and HTTP entry points; chat-ui's API routes act as the MCP client.
+
+![Component diagram of the monorepo: each MCP server's server.ts feeds index.ts and http.ts; AzLens has wiki.ts; chat-ui components call api routes which are MCP clients](docs/arch-components.png)
+
+### Chat-turn lifecycle
+
+![State diagram: Idle to Submitted to Streaming, looping through ToolCall, then Done and back to Idle](docs/arch-chatturn.png)
+
+### `search_wiki` sources
+
+![Diagram: search_wiki calls getWikiSources which fans out to Microsoft Learn, an optional Azure DevOps wiki, and custom sources, merging results](docs/arch-wiki.png)
 
 ---
 
@@ -120,12 +147,12 @@ Each MCP server is fully isolated — its own `package.json`, dependencies, and 
 
 ## Prerequisites
 
-| For | You need |
-| --- | --- |
-| Local development | Node.js 18+ (20/22 LTS recommended), npm |
-| Deployment | Azure subscription, [Azure CLI](https://learn.microsoft.com/cli/azure/), a GitHub repo |
-| chat-ui | An Azure OpenAI resource with a chat model deployment (e.g. `gpt-4o`) |
-| Easy Auth (optional) | Permission to create a Microsoft Entra app registration |
+| For                  | You need                                                                               |
+| -------------------- | -------------------------------------------------------------------------------------- |
+| Local development    | Node.js 18+ (20/22 LTS recommended), npm                                               |
+| Deployment           | Azure subscription, [Azure CLI](https://learn.microsoft.com/cli/azure/), a GitHub repo |
+| chat-ui              | An Azure OpenAI resource with a chat model deployment (e.g. `gpt-4o`)                  |
+| Easy Auth (optional) | Permission to create a Microsoft Entra app registration                                |
 
 ---
 
@@ -231,7 +258,7 @@ npm install
 npm run dev                  # http://localhost:3000
 ```
 
-Open http://localhost:3000 and try: *"read the file package.json"*, *"add 'ship v1' to my to-do list"*. Tool-call badges appear when a server is used. Easy Auth is an Azure-only feature, so the local UI is open — expected.
+Open http://localhost:3000 and try: _"read the file package.json"_, _"add 'ship v1' to my to-do list"_. Tool-call badges appear when a server is used. Easy Auth is an Azure-only feature, so the local UI is open — expected.
 
 ### Step 5 — Use from a local MCP client (stdio)
 
@@ -247,40 +274,40 @@ All configuration is via environment variables. Locally use `.env` / `.env.local
 
 ### `mcp-local-coder`
 
-| Variable | Default | Description |
-| --- | --- | --- |
+| Variable         | Default             | Description                                            |
+| ---------------- | ------------------- | ------------------------------------------------------ |
 | `WORKSPACE_ROOT` | current working dir | Sandbox root; all file paths are constrained inside it |
-| `PORT` | `3000` | HTTP port (HTTP transport only) |
+| `PORT`           | `3000`              | HTTP port (HTTP transport only)                        |
 
 ### `AzLens-mcp`
 
-| Variable | Default | Description |
-| --- | --- | --- |
-| `AZURE_SUBSCRIPTION_ID` | — | Subscription queried by `query_azure_resource` |
-| `LOG_ANALYTICS_WORKSPACE_ID` | — | Default workspace for `run_kql_query` |
-| `AZURE_CLIENT_ID` | — | Set by Bicep to the managed identity for `DefaultAzureCredential` |
-| `PORT` | `3000` | HTTP port |
+| Variable                     | Default | Description                                                       |
+| ---------------------------- | ------- | ----------------------------------------------------------------- |
+| `AZURE_SUBSCRIPTION_ID`      | —       | Subscription queried by `query_azure_resource`                    |
+| `LOG_ANALYTICS_WORKSPACE_ID` | —       | Default workspace for `run_kql_query`                             |
+| `AZURE_CLIENT_ID`            | —       | Set by Bicep to the managed identity for `DefaultAzureCredential` |
+| `PORT`                       | `3000`  | HTTP port                                                         |
 
 Auth uses `DefaultAzureCredential`: `az login` locally, managed identity in Azure. No secrets are stored in code.
 
 ### `mcp-personal-assistant`
 
-| Variable | Default | Description |
-| --- | --- | --- |
+| Variable     | Default       | Description                                           |
+| ------------ | ------------- | ----------------------------------------------------- |
 | `NOTES_ROOT` | `~/mcp-notes` | Directory holding `YYYY-MM-DD.md` notes and `todo.md` |
-| `PORT` | `3000` | HTTP port |
+| `PORT`       | `3000`        | HTTP port                                             |
 
 ### `chat-ui`
 
-| Variable | Description |
-| --- | --- |
+| Variable                     | Description                                   |
+| ---------------------------- | --------------------------------------------- |
 | `AZURE_OPENAI_RESOURCE_NAME` | Azure OpenAI resource name (not the full URL) |
-| `AZURE_OPENAI_DEPLOYMENT` | Chat model deployment name, e.g. `gpt-4o` |
-| `AZURE_OPENAI_API_VERSION` | API version, e.g. `2024-10-21` |
-| `AZURE_OPENAI_API_KEY` | API key (a Container Apps secret in Azure) |
-| `MCP_LOCAL_CODER_URL` | `mcp-local-coder` `/mcp` endpoint |
-| `MCP_AZLENS_URL` | `AzLens-mcp` `/mcp` endpoint |
-| `MCP_PERSONAL_ASSISTANT_URL` | `mcp-personal-assistant` `/mcp` endpoint |
+| `AZURE_OPENAI_DEPLOYMENT`    | Chat model deployment name, e.g. `gpt-4o`     |
+| `AZURE_OPENAI_API_VERSION`   | API version, e.g. `2024-10-21`                |
+| `AZURE_OPENAI_API_KEY`       | API key (a Container Apps secret in Azure)    |
+| `MCP_LOCAL_CODER_URL`        | `mcp-local-coder` `/mcp` endpoint             |
+| `MCP_AZLENS_URL`             | `AzLens-mcp` `/mcp` endpoint                  |
+| `MCP_PERSONAL_ASSISTANT_URL` | `mcp-personal-assistant` `/mcp` endpoint      |
 
 ---
 
@@ -288,7 +315,7 @@ Auth uses `DefaultAzureCredential`: `az login` locally, managed identity in Azur
 
 The pipeline deploys **automatically on every push to `main`**, and can also be run manually — open the **Actions** tab, select **Provision and Deploy MCP Servers**, and click **Run workflow** (manual runs let you override the resource group, region, and name prefix):
 
-**[▶ Run the deploy workflow](../../actions/workflows/deploy.yml)**  _(replace with your repo URL)_
+**[▶ Run the deploy workflow](../../actions/workflows/deploy.yml)** _(replace with your repo URL)_
 
 Either trigger provisions the infrastructure, builds & pushes all four container images to ACR, deploys the apps, and prints each endpoint in the run summary.
 
@@ -321,11 +348,11 @@ echo "AZURE_CLIENT_ID = $appId"
 
 Add these **repository secrets** (Settings → Secrets and variables → Actions):
 
-| Secret | Value |
-| --- | --- |
-| `AZURE_CLIENT_ID` | the `appId` printed above |
-| `AZURE_TENANT_ID` | `az account show --query tenantId -o tsv` |
-| `AZURE_SUBSCRIPTION_ID` | your subscription ID |
+| Secret                  | Value                                     |
+| ----------------------- | ----------------------------------------- |
+| `AZURE_CLIENT_ID`       | the `appId` printed above                 |
+| `AZURE_TENANT_ID`       | `az account show --query tenantId -o tsv` |
+| `AZURE_SUBSCRIPTION_ID` | your subscription ID                      |
 
 > If you run the workflow from a branch other than `main`, add a matching federated credential (`...:ref:refs/heads/<branch>`).
 
@@ -333,13 +360,13 @@ Add these **repository secrets** (Settings → Secrets and variables → Actions
 
 Add these repository secrets so the pipeline can configure the front end. Leave the `ENTRA_*` pair empty to deploy chat-ui **without** sign-in.
 
-| Secret | Value |
-| --- | --- |
-| `AZURE_OPENAI_RESOURCE_NAME` | Azure OpenAI resource name (not the URL) |
-| `AZURE_OPENAI_DEPLOYMENT` | chat model deployment, e.g. `gpt-4o` |
-| `AZURE_OPENAI_API_KEY` | key from the Azure OpenAI resource |
-| `ENTRA_CLIENT_ID` | Entra app (client) ID that protects chat-ui |
-| `ENTRA_CLIENT_SECRET` | client secret for that Entra app |
+| Secret                       | Value                                       |
+| ---------------------------- | ------------------------------------------- |
+| `AZURE_OPENAI_RESOURCE_NAME` | Azure OpenAI resource name (not the URL)    |
+| `AZURE_OPENAI_DEPLOYMENT`    | chat model deployment, e.g. `gpt-4o`        |
+| `AZURE_OPENAI_API_KEY`       | key from the Azure OpenAI resource          |
+| `ENTRA_CLIENT_ID`            | Entra app (client) ID that protects chat-ui |
+| `ENTRA_CLIENT_SECRET`        | client secret for that Entra app            |
 
 Create the Entra app that fronts chat-ui **after** the first deploy (so you know the chat-ui URL):
 
@@ -403,16 +430,16 @@ Then re-run `az deployment group create` passing the `*Image` parameters (see th
 
 ## Tools reference
 
-| Server | Tool | Parameters | Description |
-| --- | --- | --- | --- |
-| mcp-local-coder | `read_file` | `path` | Read a file inside `WORKSPACE_ROOT` |
-| mcp-local-coder | `write_file` | `path`, `content` | Create/overwrite a file (dirs auto-created) |
-| mcp-local-coder | `search_code` | `query` | Recursive case-insensitive text search |
-| AzLens-mcp | `query_azure_resource` | `resourceId` | Fetch an ARM resource by ID (returns a clear hint if not authenticated) |
-| AzLens-mcp | `run_kql_query` | `workspaceId?`, `query` | Run a KQL query against Log Analytics (returns a clear hint if not authenticated) |
-| AzLens-mcp | `search_wiki` | `query` | Search docs — backed by Microsoft Learn; extensible to internal wikis |
-| mcp-personal-assistant | `get_daily_notes` | `date` (YYYY-MM-DD) | Read that day's markdown notes |
-| mcp-personal-assistant | `update_todo_list` | `task`, `status` | Add/update a task (`todo`/`in-progress`/`done`) |
+| Server                 | Tool                   | Parameters              | Description                                                                       |
+| ---------------------- | ---------------------- | ----------------------- | --------------------------------------------------------------------------------- |
+| mcp-local-coder        | `read_file`            | `path`                  | Read a file inside `WORKSPACE_ROOT`                                               |
+| mcp-local-coder        | `write_file`           | `path`, `content`       | Create/overwrite a file (dirs auto-created)                                       |
+| mcp-local-coder        | `search_code`          | `query`                 | Recursive case-insensitive text search                                            |
+| AzLens-mcp             | `query_azure_resource` | `resourceId`            | Fetch an ARM resource by ID (returns a clear hint if not authenticated)           |
+| AzLens-mcp             | `run_kql_query`        | `workspaceId?`, `query` | Run a KQL query against Log Analytics (returns a clear hint if not authenticated) |
+| AzLens-mcp             | `search_wiki`          | `query`                 | Search docs — backed by Microsoft Learn; extensible to internal wikis             |
+| mcp-personal-assistant | `get_daily_notes`      | `date` (YYYY-MM-DD)     | Read that day's markdown notes                                                    |
+| mcp-personal-assistant | `update_todo_list`     | `task`, `status`        | Add/update a task (`todo`/`in-progress`/`done`)                                   |
 
 ---
 
@@ -453,11 +480,11 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 
 **API routes (Next.js route handlers)**
 
-| Route | Purpose |
-| --- | --- |
-| `POST /api/chat` | Streams a completion; connects to the MCP servers as a client and exposes their tools to the model. Accepts an optional `{ provider, model }` override. |
-| `GET /api/models` | Providers/models available, based on which API keys are configured on the server. |
-| `GET /api/mcp/health` | Server-side health check of each MCP server (avoids browser CORS). |
+| Route                 | Purpose                                                                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/chat`      | Streams a completion; connects to the MCP servers as a client and exposes their tools to the model. Accepts an optional `{ provider, model }` override. |
+| `GET /api/models`     | Providers/models available, based on which API keys are configured on the server.                                                                       |
+| `GET /api/mcp/health` | Server-side health check of each MCP server (avoids browser CORS).                                                                                      |
 
 > `search_wiki` is implemented against **Microsoft Learn** and is extensible to internal wikis (e.g. an Azure DevOps project wiki) — see [AzLens-mcp/src/wiki.ts](AzLens-mcp/src/wiki.ts).
 
@@ -478,6 +505,17 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 
 ---
 
+## Tooling & quality
+
+- **Smoke tests** — `npm run smoke` (root) spawns each MCP server over stdio and exercises its tools.
+- **Unit tests** — Vitest in-process tests for `mcp-local-coder` and `mcp-personal-assistant` (`npm test` in each), using the SDK's in-memory transport.
+- **Lint & format** — ESLint (`npm run lint`) for the MCP servers, Prettier (`npm run format`), an `.editorconfig`, and a **Husky pre-commit** hook that runs `lint-staged` (formats staged files).
+- **CI** ([.github/workflows/ci.yml](.github/workflows/ci.yml)) — smoke test, ESLint, per-project **build/typecheck + tests**, and **`bicep build`** on every pull request and push.
+- **Security** — [CodeQL](.github/workflows/codeql.yml) code scanning, [Trivy](.github/workflows/security-scan.yml) image scanning of all four containers, and [Dependabot](.github/dependabot.yml) updates for npm, Docker, and GitHub Actions.
+- **Internal-only MCP option** — deploy with `mcpIngressExternal=false` to keep the MCP servers internal to the Container Apps environment (reachable only by `chat-ui`).
+
+---
+
 ## Operations & hardening
 
 - **Session state is in-memory per replica.** For `maxReplicas > 1`, enable session affinity or externalize sessions (e.g. Redis); otherwise a client's follow-up request may hit a replica that doesn't know the session.
@@ -490,15 +528,17 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 
 ## Troubleshooting
 
-| Symptom | Likely cause / fix |
-| --- | --- |
-| Workflow fails at Azure login | Federated credential subject doesn't match the branch, or missing repo secrets |
+| Symptom                                     | Likely cause / fix                                                                |
+| ------------------------------------------- | --------------------------------------------------------------------------------- |
+| Workflow fails at Azure login               | Federated credential subject doesn't match the branch, or missing repo secrets    |
 | Deployment fails creating a role assignment | The pipeline identity needs **Owner** (or User Access Administrator) on the scope |
-| chat-ui returns 500 on send | Missing/incorrect `AZURE_OPENAI_*` values, or the model deployment name is wrong |
-| chat-ui shows no tools | An `MCP_*_URL` is unreachable or not ending in `/mcp` |
-| `AzLens-mcp` tool errors with auth | Managed identity lacks Reader / Log Analytics Reader (see Step 4) |
-| `az acr build` fails | Pipeline identity lacks push rights; Owner on the RG covers this |
+| chat-ui returns 500 on send                 | Missing/incorrect `AZURE_OPENAI_*` values, or the model deployment name is wrong  |
+| chat-ui shows no tools                      | An `MCP_*_URL` is unreachable or not ending in `/mcp`                             |
+| `AzLens-mcp` tool errors with auth          | Managed identity lacks Reader / Log Analytics Reader (see Step 4)                 |
+| `az acr build` fails                        | Pipeline identity lacks push rights; Owner on the RG covers this                  |
 
 ### Architecture
+
 #### Deployment topology
+
 Everything runs in one Container Apps environment. A single user-assigned managed identity pulls images from ACR; AzLens-mcp also uses it to query Azure. Only chat-ui is exposed to users behind Entra Easy Auth.

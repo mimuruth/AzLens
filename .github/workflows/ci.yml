@@ -30,3 +30,46 @@ jobs:
 
       - name: Run smoke test
         run: npm run smoke
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: ESLint (MCP servers)
+        run: npm run lint
+
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - mcp-local-coder
+          - AzLens-mcp
+          - mcp-personal-assistant
+          - chat-ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        working-directory: ${{ matrix.project }}
+        run: npm install --no-audit --no-fund
+      - name: Build (typecheck + compile)
+        working-directory: ${{ matrix.project }}
+        run: npm run build
+      - name: Test
+        working-directory: ${{ matrix.project }}
+        run: npm test --if-present
+
+  bicep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bicep build (lint infra)
+        run: az bicep build --file infra/main.bicep

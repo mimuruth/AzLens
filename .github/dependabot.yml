@@ -1,0 +1,39 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/chat-ui"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "npm"
+    directory: "/mcp-local-coder"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/AzLens-mcp"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/mcp-personal-assistant"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "docker"
+    directory: "/chat-ui"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "docker"
+    directory: "/mcp-local-coder"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "docker"
+    directory: "/AzLens-mcp"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "docker"
+    directory: "/mcp-personal-assistant"
+    schedule:
+      interval: "weekly"

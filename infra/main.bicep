@@ -38,6 +38,9 @@ param azLensSubscriptionId string = subscription().subscriptionId
 @description('Optional Log Analytics workspace (customer) ID used by AzLens-mcp run_kql_query.')
 param azLensLogAnalyticsCustomerId string = ''
 
+@description('Expose the MCP servers publicly (true) or keep them internal to the environment, reachable only by chat-ui (false).')
+param mcpIngressExternal bool = true
+
 // --- chat-ui (ChatGPT-style front end) ---------------------------------------
 
 @description('Container image for the chat-ui front end.')
@@ -123,7 +126,7 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   }
 }
 
-resource environment 'Microsoft.App/managedEnvironments@2024-03-01' = {
+resource acaEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
   name: environmentName
   location: location
   properties: {
@@ -145,11 +148,12 @@ module localCoder 'container-app.bicep' = {
   params: {
     name: 'mcp-local-coder'
     location: location
-    environmentId: environment.id
+    environmentId: acaEnvironment.id
     identityId: identity.id
     acrLoginServer: acr.properties.loginServer
     image: localCoderImage
     targetPort: targetPort
+    externalIngress: mcpIngressExternal
     envVars: [
       {
         name: 'PORT'
@@ -171,11 +175,12 @@ module azLens 'container-app.bicep' = {
   params: {
     name: 'azlens-mcp'
     location: location
-    environmentId: environment.id
+    environmentId: acaEnvironment.id
     identityId: identity.id
     acrLoginServer: acr.properties.loginServer
     image: azLensImage
     targetPort: targetPort
+    externalIngress: mcpIngressExternal
     envVars: [
       {
         name: 'PORT'
@@ -205,11 +210,12 @@ module personalAssistant 'container-app.bicep' = {
   params: {
     name: 'mcp-personal-assistant'
     location: location
-    environmentId: environment.id
+    environmentId: acaEnvironment.id
     identityId: identity.id
     acrLoginServer: acr.properties.loginServer
     image: personalAssistantImage
     targetPort: targetPort
+    externalIngress: mcpIngressExternal
     envVars: [
       {
         name: 'PORT'
@@ -243,7 +249,7 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
     }
   }
   properties: {
-    managedEnvironmentId: environment.id
+    managedEnvironmentId: acaEnvironment.id
     configuration: {
       activeRevisionsMode: 'Single'
       ingress: {

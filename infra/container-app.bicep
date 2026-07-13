@@ -26,6 +26,9 @@ param targetPort int = 3000
 @description('Environment variables for the container.')
 param envVars array = []
 
+@description('Whether ingress is public (external) or internal to the environment.')
+param externalIngress bool = true
+
 @description('Minimum replica count.')
 param minReplicas int = 1
 
@@ -46,7 +49,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
     configuration: {
       activeRevisionsMode: 'Single'
       ingress: {
-        external: true
+        external: externalIngress
         targetPort: targetPort
         transport: 'auto'
         allowInsecure: false
