@@ -299,15 +299,16 @@ Auth uses `DefaultAzureCredential`: `az login` locally, managed identity in Azur
 
 ### `chat-ui`
 
-| Variable                     | Description                                   |
-| ---------------------------- | --------------------------------------------- |
-| `AZURE_OPENAI_RESOURCE_NAME` | Azure OpenAI resource name (not the full URL) |
-| `AZURE_OPENAI_DEPLOYMENT`    | Chat model deployment name, e.g. `gpt-4o`     |
-| `AZURE_OPENAI_API_VERSION`   | API version, e.g. `2024-10-21`                |
-| `AZURE_OPENAI_API_KEY`       | API key (a Container Apps secret in Azure)    |
-| `MCP_LOCAL_CODER_URL`        | `mcp-local-coder` `/mcp` endpoint             |
-| `MCP_AZLENS_URL`             | `AzLens-mcp` `/mcp` endpoint                  |
-| `MCP_PERSONAL_ASSISTANT_URL` | `mcp-personal-assistant` `/mcp` endpoint      |
+| Variable                     | Description                                                                                                                                                                        |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AZURE_OPENAI_RESOURCE_NAME` | Azure OpenAI resource name (not the full URL)                                                                                                                                      |
+| `AZURE_OPENAI_DEPLOYMENT`    | Chat model deployment name, e.g. `gpt-4o`                                                                                                                                          |
+| `AZURE_OPENAI_API_VERSION`   | API version, e.g. `2024-10-21`                                                                                                                                                     |
+| `AZURE_OPENAI_API_KEY`       | API key (a Container Apps secret in Azure)                                                                                                                                         |
+| `LOCAL_OPENAI_BASE_URL`      | Optional OpenAI-compatible endpoint (LM Studio / Ollama / vLLM), e.g. `http://localhost:1234/v1`. Enables a **Local** provider whose models are auto-discovered from `/v1/models`. |
+| `MCP_LOCAL_CODER_URL`        | `mcp-local-coder` `/mcp` endpoint                                                                                                                                                  |
+| `MCP_AZLENS_URL`             | `AzLens-mcp` `/mcp` endpoint                                                                                                                                                       |
+| `MCP_PERSONAL_ASSISTANT_URL` | `mcp-personal-assistant` `/mcp` endpoint                                                                                                                                           |
 
 ---
 
@@ -464,7 +465,7 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 
 **Models**
 
-- A **model picker** in the top bar lists only the providers configured on the server (Azure OpenAI / OpenAI / Anthropic). The choice persists and is sent per message.
+- A **model picker** in the top bar lists only the providers configured on the server (Azure OpenAI / OpenAI / Anthropic / Local). The choice persists and is sent per message. A local OpenAI-compatible server (LM Studio, Ollama, vLLM) appears as **Local** when `LOCAL_OPENAI_BASE_URL` is set, with its loaded models discovered automatically.
 
 **MCP tools panel**
 

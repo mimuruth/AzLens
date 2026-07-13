@@ -6,6 +6,30 @@ export const runtime = "nodejs";
 
 type Provider = { id: string; label: string; models: string[] };
 
+/**
+ * Queries an OpenAI-compatible /models endpoint (e.g. LM Studio, Ollama) for the
+ * currently loaded model ids. Returns [] if the server is unreachable so the UI
+ * degrades gracefully.
+ */
+async function discoverLocalModels(baseUrl: string): Promise<string[]> {
+  try {
+    const url = `${baseUrl.replace(/\/$/, "")}/models`;
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${process.env.LOCAL_OPENAI_API_KEY || "lm-studio"}`,
+      },
+      signal: AbortSignal.timeout(2000),
+    });
+    if (!res.ok) return [];
+    const json = (await res.json()) as { data?: { id?: string }[] };
+    return (json.data ?? [])
+      .map((m) => m.id)
+      .filter((id): id is string => !!id);
+  } catch {
+    return [];
+  }
+}
+
 export async function GET(): Promise<Response> {
   const providers: Provider[] = [];
 
@@ -28,6 +52,16 @@ export async function GET(): Promise<Response> {
       id: "anthropic",
       label: "Anthropic",
       models: ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"],
+    });
+  }
+  if (process.env.LOCAL_OPENAI_BASE_URL) {
+    const baseUrl = process.env.LOCAL_OPENAI_BASE_URL;
+    const discovered = await discoverLocalModels(baseUrl);
+    const fallback = process.env.LOCAL_MODEL || "local-model";
+    providers.push({
+      id: "local",
+      label: process.env.LOCAL_LABEL || "Local (LM Studio)",
+      models: discovered.length > 0 ? discovered : [fallback],
     });
   }
 

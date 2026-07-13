@@ -6,8 +6,9 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 /**
  * Selects the chat model provider from environment variables.
  *
- * Choose explicitly with CHAT_PROVIDER=azure|openai|anthropic, otherwise the
- * first provider with a configured API key wins (azure → openai → anthropic).
+ * Choose explicitly with CHAT_PROVIDER=azure|openai|anthropic|local, otherwise
+ * the first provider with a configured API key wins
+ * (azure → openai → anthropic → local).
  */
 export function getModel(override?: {
   provider?: string;
@@ -42,10 +43,21 @@ export function getModel(override?: {
           "claude-3-5-sonnet-latest"
       );
     }
+    case "local": {
+      // Any OpenAI-compatible server (LM Studio, Ollama, vLLM, llama.cpp).
+      // LM Studio default: http://localhost:1234/v1 (no real key required).
+      const local = createOpenAI({
+        baseURL:
+          process.env.LOCAL_OPENAI_BASE_URL || "http://localhost:1234/v1",
+        apiKey: process.env.LOCAL_OPENAI_API_KEY || "lm-studio",
+      });
+      return local(override?.model || process.env.LOCAL_MODEL || "local-model");
+    }
     default:
       throw new Error(
         "No chat provider configured. Set one of AZURE_OPENAI_API_KEY, " +
-          "OPENAI_API_KEY, or ANTHROPIC_API_KEY (optionally with CHAT_PROVIDER)."
+          "OPENAI_API_KEY, ANTHROPIC_API_KEY, or LOCAL_OPENAI_BASE_URL " +
+          "(optionally with CHAT_PROVIDER)."
       );
   }
 }
@@ -54,5 +66,6 @@ function autoDetectProvider(): string {
   if (process.env.AZURE_OPENAI_API_KEY) return "azure";
   if (process.env.OPENAI_API_KEY) return "openai";
   if (process.env.ANTHROPIC_API_KEY) return "anthropic";
+  if (process.env.LOCAL_OPENAI_BASE_URL) return "local";
   return "";
 }
