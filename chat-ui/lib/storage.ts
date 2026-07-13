@@ -6,6 +6,8 @@ export type Conversation = {
   updatedAt: number;
   /** True once the user has manually renamed the chat (stops auto-titling). */
   renamed?: boolean;
+  /** Pinned chats show in a dedicated section above the date groups. */
+  pinned?: boolean;
 };
 
 export type Theme = "light" | "dark";
@@ -69,6 +71,24 @@ export function loadTheme(): Theme {
 
 export function saveTheme(theme: Theme): void {
   if (hasWindow()) localStorage.setItem(THEME_KEY, theme);
+}
+
+export type ModelSelection = { provider: string; model: string };
+export type ModelProvider = { id: string; label: string; models: string[] };
+const MODEL_KEY = "azlens.model";
+
+export function loadModel(): ModelSelection | null {
+  if (!hasWindow()) return null;
+  try {
+    const raw = localStorage.getItem(MODEL_KEY);
+    return raw ? (JSON.parse(raw) as ModelSelection) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveModel(sel: ModelSelection): void {
+  if (hasWindow()) localStorage.setItem(MODEL_KEY, JSON.stringify(sel));
 }
 
 /** Group conversations (already sorted newest-first) into date buckets. */

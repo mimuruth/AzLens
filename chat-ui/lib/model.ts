@@ -9,9 +9,13 @@ import { createAnthropic } from "@ai-sdk/anthropic";
  * Choose explicitly with CHAT_PROVIDER=azure|openai|anthropic, otherwise the
  * first provider with a configured API key wins (azure → openai → anthropic).
  */
-export function getModel(): LanguageModel {
+export function getModel(override?: {
+  provider?: string;
+  model?: string;
+}): LanguageModel {
   const provider =
-    (process.env.CHAT_PROVIDER ?? "").toLowerCase() || autoDetectProvider();
+    (override?.provider || process.env.CHAT_PROVIDER || "").toLowerCase() ||
+    autoDetectProvider();
 
   switch (provider) {
     case "azure": {
@@ -20,18 +24,22 @@ export function getModel(): LanguageModel {
         apiKey: process.env.AZURE_OPENAI_API_KEY ?? "",
         apiVersion: process.env.AZURE_OPENAI_API_VERSION ?? "2024-10-21",
       });
-      return azure(process.env.AZURE_OPENAI_DEPLOYMENT ?? "gpt-4o");
+      return azure(
+        override?.model || process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o"
+      );
     }
     case "openai": {
       const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY ?? "" });
-      return openai(process.env.OPENAI_MODEL ?? "gpt-4o");
+      return openai(override?.model || process.env.OPENAI_MODEL || "gpt-4o");
     }
     case "anthropic": {
       const anthropic = createAnthropic({
         apiKey: process.env.ANTHROPIC_API_KEY ?? "",
       });
       return anthropic(
-        process.env.ANTHROPIC_MODEL ?? "claude-3-5-sonnet-latest"
+        override?.model ||
+          process.env.ANTHROPIC_MODEL ||
+          "claude-3-5-sonnet-latest"
       );
     }
     default:

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { UIMessage } from "ai";
 import Sidebar from "@/components/Sidebar";
 import ChatArea from "@/components/ChatArea";
@@ -8,6 +8,8 @@ import CommandPalette from "@/components/CommandPalette";
 import {
   type Conversation,
   type Theme,
+  type ModelSelection,
+  type ModelProvider,
   loadConversations,
   saveConversations,
   loadActive,
@@ -17,8 +19,16 @@ import {
   titleFromMessages,
   loadTheme,
   saveTheme,
+  loadModel,
+  saveModel,
   newId,
 } from "@/lib/storage";
+import {
+  downloadFile,
+  exportChatMarkdown,
+  exportAllJson,
+  importAllJson,
+} from "@/lib/transfer";
 
 export default function Page() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -26,7 +36,10 @@ export default function Page() {
   const [collapsed, setCollapsed] = useState(false);
   const [theme, setTheme] = useState<Theme>("light");
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [providers, setProviders] = useState<ModelProvider[]>([]);
+  const [modelSel, setModelSel] = useState<ModelSelection | null>(null);
   const [ready, setReady] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   // Load persisted state on mount (client only, avoids hydration mismatch).
   useEffect(() => {
@@ -58,6 +71,34 @@ export default function Page() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Discover which model providers are configured on the server.
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/models")
+      .then((r) => r.json())
+      .then((list: ModelProvider[]) => {
+        if (!alive) return;
+        setProviders(list);
+        const saved = loadModel();
+        if (
+          saved &&
+          list.some(
+            (p) => p.id === saved.provider && p.models.includes(saved.model)
+          )
+        ) {
+          setModelSel(saved);
+        } else if (list.length > 0) {
+          const sel = { provider: list[0].id, model: list[0].models[0] };
+          setModelSel(sel);
+          saveModel(sel);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const persist = useCallback((list: Conversation[]) => {
@@ -133,6 +174,61 @@ export default function Page() {
     });
   }, []);
 
+  const togglePin = useCallback((id: string) => {
+    setConversations((prev) => {
+      const list = prev.map((c) =>
+        c.id === id ? { ...c, pinned: !c.pinned } : c
+      );
+      saveConversations(list);
+      return list;
+    });
+  }, []);
+
+  const changeModel = useCallback((sel: ModelSelection) => {
+    setModelSel(sel);
+    saveModel(sel);
+  }, []);
+
+  const exportChat = useCallback(() => {
+    const convo = conversations.find((c) => c.id === activeId);
+    if (!convo) return;
+    const name =
+      (convo.title.replace(/[^\w\- ]+/g, "").trim() || "chat").slice(0, 40);
+    downloadFile(`${name}.md`, exportChatMarkdown(convo), "text/markdown");
+  }, [conversations, activeId]);
+
+  const exportAllChats = useCallback(() => {
+    downloadFile(
+      "azlens-chats.json",
+      exportAllJson(conversations),
+      "application/json"
+    );
+  }, [conversations]);
+
+  const triggerImport = useCallback(() => importInputRef.current?.click(), []);
+
+  const onImportFile = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        try {
+          const imported = importAllJson(await file.text());
+          setConversations((prev) => {
+            const map = new Map(prev.map((c) => [c.id, c]));
+            imported.forEach((c) => map.set(c.id, c));
+            const list = Array.from(map.values());
+            saveConversations(list);
+            return list;
+          });
+        } catch (err) {
+          alert(`Import failed: ${(err as Error).message}`);
+        }
+      }
+      if (importInputRef.current) importInputRef.current.value = "";
+    },
+    []
+  );
+
   // Persist messages and keep the conversation title/order in sync.
   const handleMessages = useCallback(
     (id: string, messages: UIMessage[]) => {
@@ -165,16 +261,21 @@ export default function Page() {
         collapsed={collapsed}
         theme={theme}
         onToggle={() => setCollapsed((v) => !v)}
+        onOpenPalette={() => setPaletteOpen(true)}
         onNew={newChat}
         onSelect={selectChat}
         onDelete={deleteChat}
         onRename={renameChat}
+        onTogglePin={togglePin}
         onClearAll={clearAll}
         onToggleTheme={toggleTheme}
       />
       <ChatArea
         key={activeId}
         id={activeId}
+        providers={providers}
+        modelSelection={modelSel}
+        onSelectModel={changeModel}
         onMessages={handleMessages}
         onToggleSidebar={() => setCollapsed((v) => !v)}
       />
@@ -185,8 +286,18 @@ export default function Page() {
           onNew={newChat}
           onSelect={selectChat}
           onToggleTheme={toggleTheme}
+          onExportChat={exportChat}
+          onExportAll={exportAllChats}
+          onImport={triggerImport}
         />
       )}
+      <input
+        ref={importInputRef}
+        type="file"
+        accept="application/json,.json"
+        hidden
+        onChange={onImportFile}
+      />
     </div>
   );
 }

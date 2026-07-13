@@ -5,15 +5,25 @@ import { useEffect, useRef, useState } from "react";
 import type { UIMessage } from "ai";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { loadMessages } from "@/lib/storage";
+import {
+  loadMessages,
+  type ModelProvider,
+  type ModelSelection,
+} from "@/lib/storage";
 import Logo from "@/components/Logo";
 
 export default function ChatArea({
   id,
+  providers,
+  modelSelection,
+  onSelectModel,
   onMessages,
   onToggleSidebar,
 }: {
   id: string;
+  providers: ModelProvider[];
+  modelSelection: ModelSelection | null;
+  onSelectModel: (sel: ModelSelection) => void;
   onMessages: (id: string, messages: UIMessage[]) => void;
   onToggleSidebar: () => void;
 }) {
@@ -70,11 +80,20 @@ export default function ChatArea({
     e.preventDefault();
     if (isBusy || !canSend) return;
 
-    let options: { experimental_attachments?: FileList } | undefined;
+    const options: {
+      experimental_attachments?: FileList;
+      body?: Record<string, unknown>;
+    } = {};
     if (attachments.length > 0) {
       const dt = new DataTransfer();
       attachments.forEach((file) => dt.items.add(file));
-      options = { experimental_attachments: dt.files };
+      options.experimental_attachments = dt.files;
+    }
+    if (modelSelection) {
+      options.body = {
+        provider: modelSelection.provider,
+        model: modelSelection.model,
+      };
     }
 
     handleSubmit(e, options);
@@ -106,6 +125,25 @@ export default function ChatArea({
           </svg>
         </button>
         <span className="topbar-title">AzLens</span>
+        {providers.length > 0 && modelSelection && (
+          <select
+            className="model-picker"
+            value={`${modelSelection.provider}::${modelSelection.model}`}
+            onChange={(e) => {
+              const [provider, model] = e.target.value.split("::");
+              onSelectModel({ provider, model });
+            }}
+            title="Model"
+          >
+            {providers.map((p) =>
+              p.models.map((m) => (
+                <option key={`${p.id}::${m}`} value={`${p.id}::${m}`}>
+                  {p.label} · {m}
+                </option>
+              ))
+            )}
+          </select>
+        )}
       </header>
 
       <main className={`conversation ${isEmpty ? "is-empty" : ""}`}>

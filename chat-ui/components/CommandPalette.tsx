@@ -13,12 +13,18 @@ export default function CommandPalette({
   onNew,
   onSelect,
   onToggleTheme,
+  onExportChat,
+  onExportAll,
+  onImport,
 }: {
   conversations: Conversation[];
   onClose: () => void;
   onNew: () => void;
   onSelect: (id: string) => void;
   onToggleTheme: () => void;
+  onExportChat: () => void;
+  onExportAll: () => void;
+  onImport: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -29,10 +35,15 @@ export default function CommandPalette({
   }, []);
 
   const q = query.toLowerCase();
-  const actions: Item[] = [
-    { type: "action", id: "new", label: "New chat" },
-    { type: "action", id: "theme", label: "Toggle dark mode" },
-  ].filter((a) => a.label.toLowerCase().includes(q));
+  const actions: Item[] = (
+    [
+      { type: "action", id: "new", label: "New chat" },
+      { type: "action", id: "theme", label: "Toggle dark mode" },
+      { type: "action", id: "export", label: "Export current chat (Markdown)" },
+      { type: "action", id: "export-all", label: "Export all chats (JSON)" },
+      { type: "action", id: "import", label: "Import chats (JSON)" },
+    ] as Item[]
+  ).filter((a) => a.label.toLowerCase().includes(q));
 
   const chats: Item[] = conversations
     .filter((c) => c.title.toLowerCase().includes(q))
@@ -46,6 +57,9 @@ export default function CommandPalette({
     if (item.type === "action") {
       if (item.id === "new") onNew();
       if (item.id === "theme") onToggleTheme();
+      if (item.id === "export") onExportChat();
+      if (item.id === "export-all") onExportAll();
+      if (item.id === "import") onImport();
     } else {
       onSelect(item.id);
     }

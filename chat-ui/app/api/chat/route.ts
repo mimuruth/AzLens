@@ -15,12 +15,12 @@ const SYSTEM_PROMPT = [
 ].join("\n");
 
 export async function POST(req: Request) {
-  const { messages } = await req.json();
+  const { messages, provider, model } = await req.json();
 
   const { tools, close } = await getMcpTools();
 
   const result = streamText({
-    model: getModel(),
+    model: getModel({ provider, model }),
     system: SYSTEM_PROMPT,
     messages: convertToCoreMessages(messages),
     tools,
