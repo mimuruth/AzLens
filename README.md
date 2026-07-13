@@ -66,6 +66,8 @@ Collapsing the sidebar leaves a slim **icon rail** (new chat, search, theme):
   - [Post-deploy configuration](#step-4--post-deploy-configuration)
 - [Manual deploy](#manual-deploy-without-github-actions)
 - [Tools reference](#tools-reference)
+- [Chat UI functionality](#chat-ui-functionality)
+- [How it works](#how-it-works)
 - [Operations & hardening](#operations--hardening)
 - [Troubleshooting](#troubleshooting)
 
@@ -411,6 +413,68 @@ Then re-run `az deployment group create` passing the `*Image` parameters (see th
 | AzLens-mcp | `search_wiki` | `query` | Search docs/wiki (stub — wire to your backend) |
 | mcp-personal-assistant | `get_daily_notes` | `date` (YYYY-MM-DD) | Read that day's markdown notes |
 | mcp-personal-assistant | `update_todo_list` | `task`, `status` | Add/update a task (`todo`/`in-progress`/`done`) |
+
+---
+
+## Chat UI functionality
+
+The `chat-ui` front end is a full-featured, claude.ai-style client.
+
+**Conversations**
+
+- Multiple chats, persisted in the browser (localStorage) and switchable from the sidebar.
+- Auto-generated titles from the first message; **double-click a chat to rename** it.
+- **Pin** chats to a dedicated section; the rest are grouped by **Today / Yesterday / Previous 7 days / Older**.
+- Delete individual chats or **Clear all chats**.
+- **Export** a chat to Markdown or all chats to JSON, and **Import** chats back — from the command palette.
+
+**Composing & responses**
+
+- Streaming responses rendered as **Markdown** (headings, lists, tables, code blocks, links) via `react-markdown` + GFM.
+- **File & image attachments** via the ＋ button (sent as `experimental_attachments`; images are understood by vision-capable models such as `gpt-4o`).
+- Auto-growing composer — **Enter** sends, **Shift+Enter** inserts a newline.
+- Tool calls are shown inline as chips (e.g. `used search_wiki`).
+
+**Models**
+
+- A **model picker** in the top bar lists only the providers configured on the server (Azure OpenAI / OpenAI / Anthropic). The choice persists and is sent per message.
+
+**MCP tools panel**
+
+- Live **health dots** (online / down / off) for each server, polled every 15s via `/api/mcp/health`.
+- **Click a server** to expand its tools; **click a tool** to draft an example prompt into the composer.
+
+**Navigation & appearance**
+
+- **⌘K / Ctrl+K command palette** — jump to any chat or run actions (new chat, toggle theme, export/import).
+- **Dark mode** toggle (persisted).
+- Collapsible sidebar that becomes a slim **icon rail**.
+- **Search** to filter conversations.
+
+**API routes (Next.js route handlers)**
+
+| Route | Purpose |
+| --- | --- |
+| `POST /api/chat` | Streams a completion; connects to the MCP servers as a client and exposes their tools to the model. Accepts an optional `{ provider, model }` override. |
+| `GET /api/models` | Providers/models available, based on which API keys are configured on the server. |
+| `GET /api/mcp/health` | Server-side health check of each MCP server (avoids browser CORS). |
+
+> `search_wiki` is implemented against **Microsoft Learn** and is extensible to internal wikis (e.g. an Azure DevOps project wiki) — see [AzLens-mcp/src/wiki.ts](AzLens-mcp/src/wiki.ts).
+
+---
+
+## How it works
+
+**MCP servers (dual transport).** Each server's tool logic lives once in `src/server.ts` (`createServer()`), reused by `src/index.ts` (stdio) and `src/http.ts` (Streamable HTTP). The HTTP entry point runs an Express app exposing `POST` / `GET` / `DELETE` on `/mcp` with per-session `StreamableHTTPServerTransport` instances, plus `GET /health`.
+
+**chat-ui as an MCP host.** The `/api/chat` route uses the Vercel AI SDK's `streamText` with tools aggregated from all three MCP servers (via `experimental_createMCPClient` over Streamable HTTP). The model decides when to call a tool; the route executes it, feeds the result back, and streams the final answer. Unreachable MCP servers are skipped so the chat still works without them.
+
+**Authentication.**
+
+- `AzLens-mcp` uses `DefaultAzureCredential` — `az login` locally, managed identity on Azure. The Azure tools pre-check authentication and return a clear hint if not signed in.
+- `chat-ui` is protected by Microsoft Entra **Easy Auth** when deployed (configured in Bicep); model access uses provider API keys stored as Container Apps secrets.
+
+**State.** Conversations and messages persist in the browser's localStorage — there is no server-side database. MCP HTTP sessions are in-memory per replica.
 
 ---
 
