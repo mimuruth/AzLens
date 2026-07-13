@@ -17,6 +17,7 @@ export default function ChatArea({
   providers,
   modelSelection,
   onSelectModel,
+  prefill,
   onMessages,
   onToggleSidebar,
 }: {
@@ -24,13 +25,15 @@ export default function ChatArea({
   providers: ModelProvider[];
   modelSelection: ModelSelection | null;
   onSelectModel: (sel: ModelSelection) => void;
+  prefill: { text: string; nonce: number } | null;
   onMessages: (id: string, messages: UIMessage[]) => void;
   onToggleSidebar: () => void;
 }) {
-  const { messages, input, handleInputChange, handleSubmit, status } = useChat({
-    id,
-    initialMessages: loadMessages(id),
-  });
+  const { messages, input, handleInputChange, handleSubmit, status, setInput } =
+    useChat({
+      id,
+      initialMessages: loadMessages(id),
+    });
 
   const isBusy = status === "submitted" || status === "streaming";
   const formRef = useRef<HTMLFormElement>(null);
@@ -57,6 +60,15 @@ export default function ChatArea({
   useEffect(() => {
     onMessages(id, messages);
   }, [messages, id, onMessages]);
+
+  // Draft an example prompt into the composer when a tool is clicked.
+  useEffect(() => {
+    if (prefill && prefill.text) {
+      setInput(prefill.text);
+      textareaRef.current?.focus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill?.nonce]);
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {

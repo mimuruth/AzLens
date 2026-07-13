@@ -38,6 +38,9 @@ export default function Page() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [providers, setProviders] = useState<ModelProvider[]>([]);
   const [modelSel, setModelSel] = useState<ModelSelection | null>(null);
+  const [prefill, setPrefill] = useState<{ text: string; nonce: number } | null>(
+    null
+  );
   const [ready, setReady] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -189,6 +192,10 @@ export default function Page() {
     saveModel(sel);
   }, []);
 
+  const useTool = useCallback((text: string) => {
+    setPrefill({ text, nonce: Date.now() });
+  }, []);
+
   const exportChat = useCallback(() => {
     const convo = conversations.find((c) => c.id === activeId);
     if (!convo) return;
@@ -264,6 +271,7 @@ export default function Page() {
         onDelete={deleteChat}
         onRename={renameChat}
         onTogglePin={togglePin}
+        onUseTool={useTool}
         onClearAll={clearAll}
         onToggleTheme={toggleTheme}
       />
@@ -273,6 +281,7 @@ export default function Page() {
         providers={providers}
         modelSelection={modelSel}
         onSelectModel={changeModel}
+        prefill={prefill}
         onMessages={handleMessages}
         onToggleSidebar={() => setCollapsed((v) => !v)}
       />

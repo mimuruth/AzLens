@@ -6,6 +6,24 @@ import Logo from "@/components/Logo";
 
 type ServerHealth = { name: string; ok: boolean; configured: boolean };
 
+/** Example prompts per server tool, used when a tool is clicked. */
+const SERVER_TOOLS: Record<string, { name: string; example: string }[]> = {
+  "mcp-local-coder": [
+    { name: "read_file", example: "Read the file README.md" },
+    { name: "write_file", example: "Create a file notes.txt containing 'hello world'" },
+    { name: "search_code", example: "Search the code for 'TODO'" },
+  ],
+  "AzLens-mcp": [
+    { name: "query_azure_resource", example: "Query the Azure resource /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Web/sites/<name>" },
+    { name: "run_kql_query", example: "Run KQL query: AzureActivity | take 5" },
+    { name: "search_wiki", example: "Search the wiki for Azure Functions triggers and bindings" },
+  ],
+  "mcp-personal-assistant": [
+    { name: "get_daily_notes", example: "Show my notes for 2025-01-01" },
+    { name: "update_todo_list", example: "Add 'ship v1' to my to-do list with status done" },
+  ],
+};
+
 export default function Sidebar({
   conversations,
   activeId,
@@ -18,6 +36,7 @@ export default function Sidebar({
   onDelete,
   onRename,
   onTogglePin,
+  onUseTool,
   onClearAll,
   onToggleTheme,
 }: {
@@ -32,6 +51,7 @@ export default function Sidebar({
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onTogglePin: (id: string) => void;
+  onUseTool: (prompt: string) => void;
   onClearAll: () => void;
   onToggleTheme: () => void;
 }) {
@@ -39,6 +59,7 @@ export default function Sidebar({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [toolsOpen, setToolsOpen] = useState(true);
+  const [expandedServer, setExpandedServer] = useState<string | null>(null);
   const [servers, setServers] = useState<ServerHealth[]>([]);
 
   // Poll MCP server health.
@@ -272,15 +293,51 @@ export default function Sidebar({
           {toolsOpen && (
             <div className="tools-list">
               {servers.length === 0 && <p className="empty-list">Checking…</p>}
-              {servers.map((s) => (
-                <div key={s.name} className="tool-row">
-                  <span className={dotClass(s)} />
-                  <span className="tool-name">{s.name}</span>
-                  <span className="tool-status">
-                    {!s.configured ? "off" : s.ok ? "online" : "down"}
-                  </span>
-                </div>
-              ))}
+              {servers.map((s) => {
+                const tools = SERVER_TOOLS[s.name] ?? [];
+                const open = expandedServer === s.name;
+                return (
+                  <div key={s.name}>
+                    <button
+                      className="tool-row server"
+                      onClick={() =>
+                        setExpandedServer(open ? null : s.name)
+                      }
+                      aria-expanded={open}
+                      title="Show tools"
+                    >
+                      <span className={dotClass(s)} />
+                      <span className="tool-name">{s.name}</span>
+                      <span className="tool-status">
+                        {!s.configured ? "off" : s.ok ? "online" : "down"}
+                      </span>
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        className={open ? "chev open" : "chev"}
+                      >
+                        <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                    {open && tools.length > 0 && (
+                      <div className="tool-actions">
+                        {tools.map((t) => (
+                          <button
+                            key={t.name}
+                            className="tool-action"
+                            onClick={() => onUseTool(t.example)}
+                            title={`Draft: ${t.example}`}
+                          >
+                            <code>{t.name}</code>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
