@@ -126,6 +126,17 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   }
 }
 
+// Workspace-based Application Insights for distributed tracing + metrics.
+resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
+  name: '${namePrefix}-appi-${uniqueSuffix}'
+  location: location
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    WorkspaceResourceId: logAnalytics.id
+  }
+}
+
 resource acaEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
   name: environmentName
   location: location
@@ -163,6 +174,10 @@ module localCoder 'container-app.bicep' = {
         name: 'WORKSPACE_ROOT'
         value: '/app/workspace'
       }
+      {
+        name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+        value: appInsights.properties.ConnectionString
+      }
     ]
   }
   dependsOn: [
@@ -198,6 +213,10 @@ module azLens 'container-app.bicep' = {
         name: 'LOG_ANALYTICS_WORKSPACE_ID'
         value: azLensLogAnalyticsCustomerId
       }
+      {
+        name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+        value: appInsights.properties.ConnectionString
+      }
     ]
   }
   dependsOn: [
@@ -224,6 +243,10 @@ module personalAssistant 'container-app.bicep' = {
       {
         name: 'NOTES_ROOT'
         value: '/app/notes'
+      }
+      {
+        name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+        value: appInsights.properties.ConnectionString
       }
     ]
   }
@@ -329,6 +352,10 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'MCP_PERSONAL_ASSISTANT_URL'
               value: '${personalAssistant.outputs.fqdn}/mcp'
             }
+            {
+              name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+              value: appInsights.properties.ConnectionString
+            }
           ]
           probes: [
             {
@@ -389,6 +416,7 @@ resource chatUiAuth 'Microsoft.App/containerApps/authConfigs@2024-03-01' = if (e
 // ---------------------------------------------------------------------------
 output acrLoginServer string = acr.properties.loginServer
 output acrName string = acr.name
+output appInsightsConnectionString string = appInsights.properties.ConnectionString
 output managedIdentityClientId string = identity.properties.clientId
 output managedIdentityPrincipalId string = identity.properties.principalId
 output localCoderUrl string = localCoder.outputs.fqdn

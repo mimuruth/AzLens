@@ -11,6 +11,7 @@
  *   GET    /health  liveness/readiness probe for Container Apps
  */
 
+import "./telemetry.js";
 import express, { type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";

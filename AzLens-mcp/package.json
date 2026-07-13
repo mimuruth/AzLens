@@ -30,6 +30,7 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@azure/monitor-opentelemetry": "^1.8.0",
     "@modelcontextprotocol/sdk": "^1.12.0",
     "@azure/identity": "^4.5.0",
     "@azure/arm-resources": "^5.2.0",
