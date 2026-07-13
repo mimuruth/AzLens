@@ -32,11 +32,15 @@ Each MCP server ships **two transports** from a single codebase:
 
 A modern, claude.ai-style front end with a collapsible sidebar, **New chat**, search, and multiple conversations you can switch between (persisted in the browser). Each conversation streams responses from Azure OpenAI and can call the MCP tools. It also includes **dark mode**, an **MCP tools health panel** (live online/offline dots), chat **rename** + date grouping, markdown rendering, file/image attachments, and a **⌘K command palette**.
 
-![AzLens chat UI in dark mode: sidebar with date-grouped chats and an MCP tools health panel, next to a conversation with rendered markdown](docs/chat-ui-dark.png)
+![AzLens chat UI in dark mode: sidebar with a pinned chat and date-grouped chats, an MCP tools health panel, a model picker in the top bar, and a conversation with rendered markdown](docs/chat-ui-dark.png)
 
 The **⌘K command palette** — jump between chats or run actions:
 
 ![AzLens command palette opened over the chat, listing actions and chats](docs/chat-ui-palette.png)
+
+Collapsing the sidebar leaves a slim **icon rail** (new chat, search, theme):
+
+![AzLens sidebar collapsed to a slim icon rail](docs/chat-ui-rail.png)
 
 <details>
 <summary>Light mode</summary>
