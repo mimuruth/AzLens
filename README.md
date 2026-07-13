@@ -64,23 +64,23 @@ Everything runs in one Container Apps environment. A single user-assigned manage
 
 ```mermaid
 flowchart TB
-    User(["User (browser)"])
+    User["User browser"]
 
     subgraph AZ["Azure resource group"]
         subgraph ENV["Container Apps environment"]
-            CHAT["chat-ui<br/>(Next.js, Easy Auth)"]
+            CHAT["chat-ui - Next.js, Easy Auth"]
             S1["mcp-local-coder"]
             S2["AzLens-mcp"]
             S3["mcp-personal-assistant"]
         end
-        ACR[("Azure Container<br/>Registry")]
-        MI["User-assigned<br/>managed identity"]
-        LOGS[("Log Analytics")]
+        ACR["Azure Container Registry"]
+        MI["User-assigned managed identity"]
+        LOGS["Log Analytics"]
     end
 
     AOAI["Azure OpenAI"]
     ENTRA["Microsoft Entra ID"]
-    ARM["Azure Resource Manager<br/>+ Log Analytics data"]
+    ARM["Azure Resource Manager"]
 
     User -->|HTTPS| CHAT
     CHAT -->|sign-in| ENTRA
@@ -89,9 +89,9 @@ flowchart TB
     CHAT -->|/mcp| S2
     CHAT -->|/mcp| S3
     S2 -->|managed identity| ARM
-    MI -. AcrPull .-> ACR
-    ENV -. logs .-> LOGS
-    ACR -. images .-> ENV
+    MI -->|AcrPull| ACR
+    CHAT -->|logs| LOGS
+    ACR -->|images| CHAT
 ```
 
 ### Request flow (a single chat turn)
@@ -104,9 +104,9 @@ sequenceDiagram
     participant M as MCP server
 
     U->>C: prompt
-    C->>O: messages + available MCP tools
-    O-->>C: tool call (e.g. read_file)
-    C->>M: JSON-RPC over /mcp (Streamable HTTP)
+    C->>O: messages plus available MCP tools
+    O-->>C: tool call e.g. read_file
+    C->>M: JSON-RPC over /mcp
     M-->>C: tool result
     C->>O: tool result appended
     O-->>C: streamed final answer
@@ -117,12 +117,12 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    A[push to main<br/>or Run workflow] --> B[OIDC login to Azure]
-    B --> C[az group create]
-    C --> D[Deploy infra<br/>mcp-infra]
-    D --> E[az acr build x4]
-    E --> F[Deploy apps<br/>mcp-apps]
-    F --> G[Print endpoints<br/>in run summary]
+    A["push to main or Run workflow"] --> B["OIDC login to Azure"]
+    B --> C["az group create"]
+    C --> D["Deploy infra - mcp-infra"]
+    D --> E["az acr build x4"]
+    E --> F["Deploy apps - mcp-apps"]
+    F --> G["Print endpoints in run summary"]
 ```
 
 ---
