@@ -4,10 +4,15 @@ export type Conversation = {
   id: string;
   title: string;
   updatedAt: number;
+  /** True once the user has manually renamed the chat (stops auto-titling). */
+  renamed?: boolean;
 };
+
+export type Theme = "light" | "dark";
 
 const CONVOS_KEY = "azlens.conversations";
 const ACTIVE_KEY = "azlens.active";
+const THEME_KEY = "azlens.theme";
 const messagesKey = (id: string) => `azlens.messages.${id}`;
 
 const hasWindow = () => typeof window !== "undefined";
@@ -55,6 +60,45 @@ export function loadActive(): string | null {
 
 export function saveActive(id: string): void {
   if (hasWindow()) localStorage.setItem(ACTIVE_KEY, id);
+}
+
+export function loadTheme(): Theme {
+  if (!hasWindow()) return "light";
+  return localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
+}
+
+export function saveTheme(theme: Theme): void {
+  if (hasWindow()) localStorage.setItem(THEME_KEY, theme);
+}
+
+/** Group conversations (already sorted newest-first) into date buckets. */
+export function groupByDate(
+  list: Conversation[]
+): { label: string; items: Conversation[] }[] {
+  const now = new Date();
+  const startOfDay = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  ).getTime();
+  const yesterday = startOfDay - 86_400_000;
+  const week = startOfDay - 7 * 86_400_000;
+
+  const buckets: { label: string; items: Conversation[] }[] = [
+    { label: "Today", items: [] },
+    { label: "Yesterday", items: [] },
+    { label: "Previous 7 days", items: [] },
+    { label: "Older", items: [] },
+  ];
+
+  for (const c of list) {
+    if (c.updatedAt >= startOfDay) buckets[0].items.push(c);
+    else if (c.updatedAt >= yesterday) buckets[1].items.push(c);
+    else if (c.updatedAt >= week) buckets[2].items.push(c);
+    else buckets[3].items.push(c);
+  }
+
+  return buckets.filter((b) => b.items.length > 0);
 }
 
 /** Derive a short conversation title from the first user message. */

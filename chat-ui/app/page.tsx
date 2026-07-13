@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import type { UIMessage } from "ai";
 import Sidebar from "@/components/Sidebar";
 import ChatArea from "@/components/ChatArea";
+import CommandPalette from "@/components/CommandPalette";
 import {
   type Conversation,
+  type Theme,
   loadConversations,
   saveConversations,
   loadActive,
@@ -13,6 +15,8 @@ import {
   saveMessages,
   deleteMessages,
   titleFromMessages,
+  loadTheme,
+  saveTheme,
   newId,
 } from "@/lib/storage";
 
@@ -20,6 +24,8 @@ export default function Page() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState("");
   const [collapsed, setCollapsed] = useState(false);
+  const [theme, setTheme] = useState<Theme>("light");
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [ready, setReady] = useState(false);
 
   // Load persisted state on mount (client only, avoids hydration mismatch).
@@ -34,9 +40,24 @@ export default function Page() {
       saveActive(id);
     }
     if (!list.some((c) => c.id === active)) active = list[0].id;
+    const t = loadTheme();
+    document.documentElement.setAttribute("data-theme", t);
+    setTheme(t);
     setConversations(list);
     setActiveId(active);
     setReady(true);
+  }, []);
+
+  // Global Cmd/Ctrl+K to toggle the command palette.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   const persist = useCallback((list: Conversation[]) => {
@@ -58,6 +79,25 @@ export default function Page() {
   const selectChat = useCallback((id: string) => {
     setActiveId(id);
     saveActive(id);
+  }, []);
+
+  const renameChat = useCallback((id: string, title: string) => {
+    setConversations((prev) => {
+      const list = prev.map((c) =>
+        c.id === id ? { ...c, title, renamed: true } : c
+      );
+      saveConversations(list);
+      return list;
+    });
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => {
+      const next: Theme = prev === "dark" ? "light" : "dark";
+      saveTheme(next);
+      document.documentElement.setAttribute("data-theme", next);
+      return next;
+    });
   }, []);
 
   const deleteChat = useCallback(
@@ -102,7 +142,9 @@ export default function Page() {
         const idx = prev.findIndex((c) => c.id === id);
         if (idx < 0) return prev;
         const current = prev[idx];
-        const title = nextTitle ?? current.title;
+        const title = current.renamed
+          ? current.title
+          : nextTitle ?? current.title;
         if (title === current.title && messages.length === 0) return prev;
         const list = [...prev];
         list[idx] = { ...current, title, updatedAt: Date.now() };
@@ -121,11 +163,14 @@ export default function Page() {
         conversations={conversations}
         activeId={activeId}
         collapsed={collapsed}
+        theme={theme}
         onToggle={() => setCollapsed((v) => !v)}
         onNew={newChat}
         onSelect={selectChat}
         onDelete={deleteChat}
+        onRename={renameChat}
         onClearAll={clearAll}
+        onToggleTheme={toggleTheme}
       />
       <ChatArea
         key={activeId}
@@ -133,6 +178,15 @@ export default function Page() {
         onMessages={handleMessages}
         onToggleSidebar={() => setCollapsed((v) => !v)}
       />
+      {paletteOpen && (
+        <CommandPalette
+          conversations={conversations}
+          onClose={() => setPaletteOpen(false)}
+          onNew={newChat}
+          onSelect={selectChat}
+          onToggleTheme={toggleTheme}
+        />
+      )}
     </div>
   );
 }
