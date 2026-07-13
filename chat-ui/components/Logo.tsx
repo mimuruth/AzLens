@@ -16,7 +16,7 @@ export default function Logo({
       viewBox="0 0 24 24"
       fill="none"
       stroke="#d97757"
-      strokeWidth="1.9"
+      strokeWidth="1.6"
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
