@@ -473,7 +473,7 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 - **File & image attachments** via the ＋ button (sent as `experimental_attachments`; images are understood by vision-capable models such as `gpt-4o`).
 - Auto-growing composer — **Enter** sends, **Shift+Enter** inserts a newline.
 - **Stop** a streaming response, **Regenerate** the last answer, **Copy** any reply, and **Edit & resend** a previous user message (which trims the turns after it).
-- A small footer under each answer shows the agent, model, routed tier, and — when the provider reports it — **token usage and an estimated cost**.
+- A small footer under each answer shows the agent, model, routed tier, and **token usage with an estimated cost** — using the provider's reported token counts when available, or a labelled `~approx` estimate (characters ÷ 4) otherwise.
 - Tool calls are shown inline as chips (e.g. `used search_wiki`).
 
 **Models & routing**

@@ -169,6 +169,15 @@ export default function ChatArea({
     return fromParts || (message as { content?: string }).content || "";
   }
 
+  // Rough token estimate (~chars ÷ 4) for the turn ending at `message`, used
+  // only when the provider doesn't report real usage.
+  function approxTokens(message: UIMessage): number {
+    const idx = messages.findIndex((m) => m.id === message.id);
+    const upto = idx < 0 ? [message] : messages.slice(0, idx + 1);
+    const chars = upto.reduce((sum, m) => sum + textOf(m).length, 0);
+    return Math.max(1, Math.round(chars / 4));
+  }
+
   function startEdit(message: UIMessage) {
     setEditingId(message.id);
     setEditText(textOf(message));
@@ -375,11 +384,22 @@ export default function ChatArea({
                                 ? (u.promptTokens ?? 0) +
                                   (u.completionTokens ?? 0)
                                 : 0);
-                            return total > 0 ? (
-                              <span className="rb-usage">
-                                {total.toLocaleString()} tokens
+                            if (total > 0) {
+                              return (
+                                <span className="rb-usage">
+                                  {total.toLocaleString()} tokens
+                                </span>
+                              );
+                            }
+                            // Provider didn't report usage — show an estimate.
+                            return (
+                              <span
+                                className="rb-usage rb-approx"
+                                title="Estimated (characters ÷ 4)"
+                              >
+                                ~{approxTokens(message).toLocaleString()} tokens
                               </span>
-                            ) : null;
+                            );
                           })()}
                           {info.costUsd != null && (
                             <span className="rb-cost">

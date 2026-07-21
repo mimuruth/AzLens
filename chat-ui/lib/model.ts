@@ -30,7 +30,13 @@ export function getModel(override?: {
       );
     }
     case "openai": {
-      const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY ?? "" });
+      // `compatibility: "strict"` makes the SDK send
+      // `stream_options: { include_usage: true }`, so token usage is reported
+      // for streamed responses (needed for the usage/cost footer).
+      const openai = createOpenAI({
+        apiKey: process.env.OPENAI_API_KEY ?? "",
+        compatibility: "strict",
+      });
       return openai(override?.model || process.env.OPENAI_MODEL || "gpt-4o");
     }
     case "anthropic": {

@@ -1108,6 +1108,11 @@ code {
   color: var(--text-muted, #8a8a8a);
 }
 
+.rb-approx {
+  font-style: italic;
+  opacity: 0.85;
+}
+
 /* ---- Approval toggle (topbar) ---- */
 .approval-toggle {
   display: inline-flex;
