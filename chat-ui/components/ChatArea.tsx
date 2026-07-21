@@ -277,7 +277,9 @@ export default function ChatArea({
             <path d="M9 4v16" stroke="currentColor" strokeWidth="1.8" />
           </svg>
         </button>
-        <span className="topbar-title">AzLens</span>
+        <span className="topbar-title wordmark">
+          <span className="wm-accent">Az</span>Lens
+        </span>
         <button
           type="button"
           className={`approval-toggle ${requireApproval ? "on" : "off"}`}

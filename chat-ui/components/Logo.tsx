@@ -1,6 +1,10 @@
 /**
- * AzLens brand mark: a monoline camera aperture (lens) drawn with a warm
- * coral→violet gradient stroke — a clean, modern AI-product style.
+ * AzLens brand mark.
+ *
+ * A rounded-square (squircle) tile filled with the brand cyan→indigo→violet
+ * gradient, holding a bold white "A" monogram whose counter frames a focal dot
+ * — the "lens" that AzLens focuses through. App-icon friendly and legible at
+ * every size used in the UI (24–44px).
  */
 export default function Logo({
   size = 24,
@@ -9,18 +13,14 @@ export default function Logo({
   size?: number;
   className?: string;
 }) {
-  // Unique gradient id per instance so multiple logos on a page render correctly.
+  // Unique gradient id per size so multiple logos on a page render correctly.
   const gid = `azlens-grad-${size}`;
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 24 24"
+      viewBox="0 0 32 32"
       fill="none"
-      stroke={`url(#${gid})`}
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
       className={className}
       role="img"
       aria-label="AzLens"
@@ -28,24 +28,35 @@ export default function Logo({
       <defs>
         <linearGradient
           id={gid}
-          x1="3"
-          y1="3"
-          x2="21"
-          y2="21"
+          x1="2"
+          y1="2"
+          x2="30"
+          y2="30"
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0" stopColor="#e6a07f" />
-          <stop offset="0.55" stopColor="#d97757" />
-          <stop offset="1" stopColor="#8b6bd9" />
+          <stop offset="0" stopColor="#22d3ee" />
+          <stop offset="0.52" stopColor="#6366f1" />
+          <stop offset="1" stopColor="#8b5cf6" />
         </linearGradient>
       </defs>
-      <circle cx="12" cy="12" r="10" />
-      <path d="M14.31 8l5.74 9.94" />
-      <path d="M9.69 8h11.48" />
-      <path d="M7.38 12l5.74-9.94" />
-      <path d="M9.69 16L3.95 6.06" />
-      <path d="M14.31 16H2.83" />
-      <path d="M16.62 12l-5.74 9.94" />
+      <rect x="1" y="1" width="30" height="30" rx="8.5" fill={`url(#${gid})`} />
+      {/* "A" monogram */}
+      <path
+        d="M9 23.5 L16 8 L23 23.5"
+        fill="none"
+        stroke="#fff"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M11.8 17.6 H20.2"
+        stroke="#fff"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      {/* focal point (the lens) */}
+      <circle cx="16" cy="13.6" r="1.45" fill="#fff" />
     </svg>
   );
 }

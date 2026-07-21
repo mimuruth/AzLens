@@ -10,17 +10,30 @@ type ServerHealth = { name: string; ok: boolean; configured: boolean };
 const SERVER_TOOLS: Record<string, { name: string; example: string }[]> = {
   "mcp-local-coder": [
     { name: "read_file", example: "Read the file README.md" },
-    { name: "write_file", example: "Create a file notes.txt containing 'hello world'" },
+    {
+      name: "write_file",
+      example: "Create a file notes.txt containing 'hello world'",
+    },
     { name: "search_code", example: "Search the code for 'TODO'" },
   ],
   "AzLens-mcp": [
-    { name: "query_azure_resource", example: "Query the Azure resource /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Web/sites/<name>" },
+    {
+      name: "query_azure_resource",
+      example:
+        "Query the Azure resource /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Web/sites/<name>",
+    },
     { name: "run_kql_query", example: "Run KQL query: AzureActivity | take 5" },
-    { name: "search_wiki", example: "Search the wiki for Azure Functions triggers and bindings" },
+    {
+      name: "search_wiki",
+      example: "Search the wiki for Azure Functions triggers and bindings",
+    },
   ],
   "mcp-personal-assistant": [
     { name: "get_daily_notes", example: "Show my notes for 2025-01-01" },
-    { name: "update_todo_list", example: "Add 'ship v1' to my to-do list with status done" },
+    {
+      name: "update_todo_list",
+      example: "Add 'ship v1' to my to-do list with status done",
+    },
   ],
 };
 
@@ -182,33 +195,94 @@ export default function Sidebar({
     return (
       <aside className="sidebar is-collapsed">
         <div className="rail">
-          <button className="icon-btn" onClick={onToggle} aria-label="Expand sidebar" title="Expand sidebar">
+          <button
+            className="icon-btn"
+            onClick={onToggle}
+            aria-label="Expand sidebar"
+            title="Expand sidebar"
+          >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <rect x="3" y="4" width="18" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
+              <rect
+                x="3"
+                y="4"
+                width="18"
+                height="16"
+                rx="2.5"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              />
               <path d="M9 4v16" stroke="currentColor" strokeWidth="1.8" />
             </svg>
           </button>
-          <button className="icon-btn rail-new" onClick={onNew} aria-label="New chat" title="New chat">
+          <button
+            className="icon-btn rail-new"
+            onClick={onNew}
+            aria-label="New chat"
+            title="New chat"
+          >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <path
+                d="M12 5v14M5 12h14"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
             </svg>
           </button>
-          <button className="icon-btn" onClick={onOpenPalette} aria-label="Search" title="Search (Cmd/Ctrl+K)">
+          <button
+            className="icon-btn"
+            onClick={onOpenPalette}
+            aria-label="Search"
+            title="Search (Cmd/Ctrl+K)"
+          >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
-              <path d="M21 21l-4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              <circle
+                cx="11"
+                cy="11"
+                r="7"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              />
+              <path
+                d="M21 21l-4-4"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
             </svg>
           </button>
           <div className="rail-spacer" />
-          <button className="icon-btn" onClick={onToggleTheme} aria-label="Toggle theme" title="Toggle theme">
+          <button
+            className="icon-btn"
+            onClick={onToggleTheme}
+            aria-label="Toggle theme"
+            title="Toggle theme"
+          >
             {theme === "dark" ? (
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="4.5" stroke="currentColor" strokeWidth="1.7" />
-                <path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="4.5"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                />
+                <path
+                  d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                />
               </svg>
             ) : (
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                <path
+                  d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             )}
           </button>
@@ -223,7 +297,9 @@ export default function Sidebar({
         <div className="sidebar-head">
           <div className="brand">
             <Logo size={24} />
-            <span>AzLens</span>
+            <span className="wordmark">
+              <span className="wm-accent">Az</span>Lens
+            </span>
           </div>
           <button
             className="icon-btn"
@@ -232,7 +308,15 @@ export default function Sidebar({
             title="Collapse sidebar"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <rect x="3" y="4" width="18" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
+              <rect
+                x="3"
+                y="4"
+                width="18"
+                height="16"
+                rx="2.5"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              />
               <path d="M9 4v16" stroke="currentColor" strokeWidth="1.8" />
             </svg>
           </button>
@@ -240,15 +324,31 @@ export default function Sidebar({
 
         <button className="new-chat" onClick={onNew}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <path
+              d="M12 5v14M5 12h14"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
           </svg>
           New chat
         </button>
 
         <div className="search">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-            <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
-            <path d="M21 21l-4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            <circle
+              cx="11"
+              cy="11"
+              r="7"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            />
+            <path
+              d="M21 21l-4-4"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            />
           </svg>
           <input
             value={query}
@@ -258,7 +358,9 @@ export default function Sidebar({
         </div>
 
         <nav className="chat-list">
-          {filtered.length === 0 && <p className="empty-list">No chats found.</p>}
+          {filtered.length === 0 && (
+            <p className="empty-list">No chats found.</p>
+          )}
           {pinned.length > 0 && (
             <div>
               <div className="section-label">Pinned</div>
@@ -287,7 +389,13 @@ export default function Sidebar({
               fill="none"
               className={toolsOpen ? "chev open" : "chev"}
             >
-              <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path
+                d="M6 9l6 6 6-6"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </button>
           {toolsOpen && (
@@ -300,9 +408,7 @@ export default function Sidebar({
                   <div key={s.name}>
                     <button
                       className="tool-row server"
-                      onClick={() =>
-                        setExpandedServer(open ? null : s.name)
-                      }
+                      onClick={() => setExpandedServer(open ? null : s.name)}
                       aria-expanded={open}
                       title="Show tools"
                     >
@@ -318,7 +424,13 @@ export default function Sidebar({
                         fill="none"
                         className={open ? "chev open" : "chev"}
                       >
-                        <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <path
+                          d="M6 9l6 6 6-6"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
                       </svg>
                     </button>
                     {open && tools.length > 0 && (
@@ -346,7 +458,13 @@ export default function Sidebar({
           <button className="foot-btn" onClick={onToggleTheme}>
             {theme === "dark" ? (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="4.5" stroke="currentColor" strokeWidth="1.7" />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="4.5"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                />
                 <path
                   d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"
                   stroke="currentColor"
