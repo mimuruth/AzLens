@@ -34,7 +34,7 @@ A modern, claude.ai-style front end with a collapsible sidebar, **New chat**, se
 
 Highlights: **multi-provider models** (Azure OpenAI / OpenAI / Anthropic / local LM Studio-style servers) with an **Auto router** that sends simple prompts to a cheap model and complex ones to a powerful model; switchable **agents** (General / Code / Azure / Personal Assistant), each scoped to the right MCP servers; **tool approval** for mutating tools; **stop / regenerate / copy / edit-and-resend**; **dark mode**; an **MCP tools health panel** (live online/offline dots); chat **rename** + date grouping; markdown rendering; file/image attachments; and a **⌘K command palette**.
 
-![AzLens chat UI in dark mode: sidebar with a pinned chat and date-grouped chats, an MCP tools health panel, a model picker in the top bar, and a conversation with rendered markdown](docs/chat-ui-dark.png)
+![AzLens chat UI in dark mode: sidebar with a pinned chat and date-grouped chats, an MCP tools health panel, a model picker in the top bar, and a conversation with rendered markdown](docs/chat-ui-hero.png)
 
 The **⌘K command palette** — jump between chats or run actions:
 

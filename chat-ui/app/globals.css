@@ -5,8 +5,8 @@
   --text: #1a1c23;
   --text-muted: #616572;
   --border: #e4e6ee;
-  --accent: #6155f5;
-  --accent-hover: #4f43e0;
+  --accent: #5061f0;
+  --accent-hover: #3e4ede;
   --radius: 24px;
   --max-width: 46rem;
   --sidebar-w: 272px;
@@ -32,8 +32,8 @@
   --text: #e8e9f1;
   --text-muted: #9a9eae;
   --border: #2b2f41;
-  --accent: #8b83ff;
-  --accent-hover: #a29bff;
+  --accent: #8493ff;
+  --accent-hover: #9aa7ff;
   --sidebar-bg: #101122;
   --hover: rgba(255, 255, 255, 0.06);
   --hover-strong: rgba(255, 255, 255, 0.1);
@@ -311,10 +311,14 @@ body {
 .wordmark {
   font-weight: 650;
   letter-spacing: -0.02em;
+  background: var(--brand-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .wm-accent {
-  color: var(--accent);
+  color: inherit;
 }
 
 /* ---- Top bar ---- */
