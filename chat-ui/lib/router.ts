@@ -152,10 +152,15 @@ export type RouteDecision = {
  *
  * Overridable with AUTO_SIMPLE / AUTO_COMPLEX env vars in the form
  * "provider:model" (e.g. AUTO_COMPLEX="anthropic:claude-3-5-sonnet-latest").
+ *
+ * Pass `exclude` to skip providers (used for fallback when one is unreachable).
  */
-export function resolveAutoModel(text: string): RouteDecision {
+export function resolveAutoModel(
+  text: string,
+  exclude: ProviderId[] = []
+): RouteDecision {
   const { tier, signals } = classifyComplexity(text);
-  const avail = availableProviders();
+  const avail = availableProviders().filter((p) => !exclude.includes(p));
 
   const override = parseOverride(
     tier === "complex" ? process.env.AUTO_COMPLEX : process.env.AUTO_SIMPLE
@@ -187,4 +192,28 @@ export function resolveAutoModel(text: string): RouteDecision {
     tier,
     reason: `${tier} (${reasonSignals})`,
   };
+}
+
+/**
+ * Quick reachability probe. Only the local server can realistically be
+ * configured-but-down (cloud providers are assumed reachable when a key is
+ * set), so this checks the local OpenAI-compatible /models endpoint.
+ */
+export async function isProviderReachable(
+  provider: ProviderId
+): Promise<boolean> {
+  if (provider !== "local") return true;
+  const base = process.env.LOCAL_OPENAI_BASE_URL;
+  if (!base) return false;
+  try {
+    const res = await fetch(`${base.replace(/\/$/, "")}/models`, {
+      headers: {
+        Authorization: `Bearer ${process.env.LOCAL_OPENAI_API_KEY || "lm-studio"}`,
+      },
+      signal: AbortSignal.timeout(1500),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }

@@ -461,12 +461,18 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 - Streaming responses rendered as **Markdown** (headings, lists, tables, code blocks, links) via `react-markdown` + GFM.
 - **File & image attachments** via the ＋ button (sent as `experimental_attachments`; images are understood by vision-capable models such as `gpt-4o`).
 - Auto-growing composer — **Enter** sends, **Shift+Enter** inserts a newline.
+- **Stop** a streaming response, **Regenerate** the last answer, **Copy** any reply, and **Edit & resend** a previous user message (which trims the turns after it).
 - Tool calls are shown inline as chips (e.g. `used search_wiki`).
 
 **Models & routing**
 
 - A **model picker** in the top bar lists only the providers configured on the server (Azure OpenAI / OpenAI / Anthropic / Local). The choice persists and is sent per message. A local OpenAI-compatible server (LM Studio, Ollama, vLLM) appears as **Local** when `LOCAL_OPENAI_BASE_URL` is set, with its loaded models discovered automatically.
 - **Auto (route by complexity)** — the default option. A zero-cost heuristic scores each prompt and routes **simple** requests to a cheap/fast model and **complex** ones (code, multi-step reasoning, long or multi-part prompts) to the most capable model available. With a local model configured, simple prompts prefer the free **Local** model and complex prompts go to the best cloud model. The chosen agent, model, and tier are shown as a small badge above each answer. Override the picks with `AUTO_SIMPLE` / `AUTO_COMPLEX` (`provider:model`).
+- **Routing resilience** — if Auto routes to a local server that is currently offline, it automatically falls back to the next available provider instead of failing the turn (the badge shows `· local offline`).
+
+**Tool approval (human-in-the-loop)**
+
+- The **Approvals** toggle in the top bar (on by default) requires explicit confirmation before **mutating** tools run (`write_file`, `update_todo_list`). When the model calls one, its `execute` is withheld server-side and the UI shows **Approve / Deny**; approving runs it via `POST /api/tool` and the model continues. Turn it off to let tools run automatically. Configure the sensitive-tool list in [chat-ui/lib/tools.ts](chat-ui/lib/tools.ts).
 
 **Agents**
 
@@ -495,6 +501,7 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `POST /api/chat`      | Streams a completion; connects to the MCP servers as a client and exposes their tools to the model. Accepts an optional `{ provider, model, agentId }`. Resolves the agent (system prompt + server scope) and, for `provider: "auto"`, routes by task complexity. |
 | `GET /api/models`     | Providers/models available, based on which API keys are configured on the server.                                                                                                                                                                                 |
+| `POST /api/tool`      | Executes a single MCP tool after the user approves it in the UI (used by tool-approval mode).                                                                                                                                                                     |
 | `GET /api/mcp/health` | Server-side health check of each MCP server (avoids browser CORS).                                                                                                                                                                                                |
 
 > `search_wiki` is implemented against **Microsoft Learn** and is extensible to internal wikis (e.g. an Azure DevOps project wiki) — see [AzLens-mcp/src/wiki.ts](AzLens-mcp/src/wiki.ts).

@@ -101,6 +101,18 @@ export function saveAgentId(id: string): void {
   if (hasWindow()) localStorage.setItem(AGENT_KEY, id);
 }
 
+const APPROVAL_KEY = "azlens.approval";
+
+/** Whether mutating tools require explicit approval. Defaults to true. */
+export function loadApproval(): boolean {
+  if (!hasWindow()) return true;
+  return localStorage.getItem(APPROVAL_KEY) !== "off";
+}
+
+export function saveApproval(on: boolean): void {
+  if (hasWindow()) localStorage.setItem(APPROVAL_KEY, on ? "on" : "off");
+}
+
 /** Group conversations (already sorted newest-first) into date buckets. */
 export function groupByDate(
   list: Conversation[]

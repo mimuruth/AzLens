@@ -11,6 +11,7 @@ import {
   type ModelSelection,
 } from "@/lib/storage";
 import { AGENTS } from "@/lib/agents";
+import { isSensitiveTool } from "@/lib/tools";
 import Logo from "@/components/Logo";
 
 type RouteAnnotation = {
@@ -28,6 +29,8 @@ export default function ChatArea({
   onSelectModel,
   agentId,
   onSelectAgent,
+  requireApproval,
+  onToggleApproval,
   prefill,
   onMessages,
   onToggleSidebar,
@@ -38,15 +41,47 @@ export default function ChatArea({
   onSelectModel: (sel: ModelSelection) => void;
   agentId: string;
   onSelectAgent: (id: string) => void;
+  requireApproval: boolean;
+  onToggleApproval: () => void;
   prefill: { text: string; nonce: number } | null;
   onMessages: (id: string, messages: UIMessage[]) => void;
   onToggleSidebar: () => void;
 }) {
-  const { messages, input, handleInputChange, handleSubmit, status, setInput } =
-    useChat({
-      id,
-      initialMessages: loadMessages(id),
-    });
+  // Refs keep the latest selection available to prepareRequestBody, which the
+  // SDK also calls for automatic tool-continuation requests.
+  const agentIdRef = useRef(agentId);
+  agentIdRef.current = agentId;
+  const modelRef = useRef(modelSelection);
+  modelRef.current = modelSelection;
+  const approvalRef = useRef(requireApproval);
+  approvalRef.current = requireApproval;
+
+  const {
+    messages,
+    input,
+    handleInputChange,
+    handleSubmit,
+    status,
+    setInput,
+    setMessages,
+    stop,
+    reload,
+    append,
+    addToolResult,
+  } = useChat({
+    id,
+    initialMessages: loadMessages(id),
+    // Auto-continue after a tool result is added (e.g. after an approval).
+    maxSteps: 5,
+    experimental_prepareRequestBody: ({ messages }) => ({
+      messages,
+      agentId: agentIdRef.current,
+      requireApproval: approvalRef.current,
+      ...(modelRef.current
+        ? { provider: modelRef.current.provider, model: modelRef.current.model }
+        : {}),
+    }),
+  });
 
   const isBusy = status === "submitted" || status === "streaming";
   const formRef = useRef<HTMLFormElement>(null);
@@ -54,6 +89,8 @@ export default function ChatArea({
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
 
   const canSend = input.trim().length > 0 || attachments.length > 0;
 
@@ -105,28 +142,93 @@ export default function ChatArea({
     e.preventDefault();
     if (isBusy || !canSend) return;
 
-    const options: {
-      experimental_attachments?: FileList;
-      body?: Record<string, unknown>;
-    } = {};
+    const options: { experimental_attachments?: FileList } = {};
     if (attachments.length > 0) {
       const dt = new DataTransfer();
       attachments.forEach((file) => dt.items.add(file));
       options.experimental_attachments = dt.files;
     }
-    options.body = {
-      agentId,
-      ...(modelSelection
-        ? { provider: modelSelection.provider, model: modelSelection.model }
-        : {}),
-    };
 
     handleSubmit(e, options);
     setAttachments([]);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
+  function textOf(message: UIMessage): string {
+    const fromParts = (message.parts ?? [])
+      .filter((p) => p.type === "text")
+      .map((p) => (p as { text: string }).text)
+      .join("\n")
+      .trim();
+    return fromParts || (message as { content?: string }).content || "";
+  }
+
+  function startEdit(message: UIMessage) {
+    setEditingId(message.id);
+    setEditText(textOf(message));
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditText("");
+  }
+
+  function saveEdit(message: UIMessage) {
+    const idx = messages.findIndex((m) => m.id === message.id);
+    if (idx < 0) return;
+    const text = editText.trim();
+    setEditingId(null);
+    setEditText("");
+    if (!text) return;
+    // Drop the edited message and everything after it, then resend.
+    setMessages(messages.slice(0, idx));
+    append({ role: "user", content: text });
+  }
+
+  async function copyMessage(message: UIMessage) {
+    try {
+      await navigator.clipboard.writeText(textOf(message));
+    } catch {
+      /* clipboard may be unavailable — ignore */
+    }
+  }
+
+  async function approveTool(
+    toolCallId: string,
+    toolName: string,
+    args: unknown
+  ) {
+    try {
+      const res = await fetch("/api/tool", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tool: toolName, args }),
+      });
+      const json = await res.json();
+      addToolResult({
+        toolCallId,
+        result: json.result ?? { error: json.error ?? "Tool call failed." },
+      });
+    } catch (err) {
+      addToolResult({
+        toolCallId,
+        result: { error: (err as Error).message },
+      });
+    }
+  }
+
+  function denyTool(toolCallId: string) {
+    addToolResult({
+      toolCallId,
+      result: "The user denied this tool call.",
+    });
+  }
+
   const isEmpty = messages.length === 0;
+
+  const lastAssistantId = [...messages]
+    .reverse()
+    .find((m) => m.role === "assistant")?.id;
 
   function routeInfo(annotations: unknown): RouteAnnotation | null {
     if (!Array.isArray(annotations) || annotations.length === 0) return null;
@@ -157,6 +259,36 @@ export default function ChatArea({
           </svg>
         </button>
         <span className="topbar-title">AzLens</span>
+        <button
+          type="button"
+          className={`approval-toggle ${requireApproval ? "on" : "off"}`}
+          onClick={onToggleApproval}
+          aria-pressed={requireApproval}
+          title={
+            requireApproval
+              ? "Tool approval is ON — mutating tools ask before running"
+              : "Tool approval is OFF — tools run automatically"
+          }
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            />
+            {requireApproval && (
+              <path
+                d="M9 12l2 2 4-4"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )}
+          </svg>
+          {requireApproval ? "Approvals" : "Auto-run"}
+        </button>
         <select
           className="agent-picker"
           value={agentId}
@@ -228,44 +360,141 @@ export default function ChatArea({
                         </div>
                       );
                     })()}
-                  {message.experimental_attachments?.map((att, i) =>
-                    att.contentType?.startsWith("image/") ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        key={`att-${i}`}
-                        className="att-img"
-                        src={att.url}
-                        alt={att.name ?? "attachment"}
+                  {editingId === message.id ? (
+                    <div className="edit-box">
+                      <textarea
+                        className="edit-input"
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        rows={3}
+                        autoFocus
                       />
-                    ) : (
-                      <div key={`att-${i}`} className="att-file">
-                        <span className="clip">📎</span>
-                        {att.name ?? "file"}
+                      <div className="edit-actions">
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          onClick={() => saveEdit(message)}
+                        >
+                          Save &amp; submit
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          onClick={cancelEdit}
+                        >
+                          Cancel
+                        </button>
                       </div>
-                    )
+                    </div>
+                  ) : (
+                    <>
+                      {message.experimental_attachments?.map((att, i) =>
+                        att.contentType?.startsWith("image/") ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            key={`att-${i}`}
+                            className="att-img"
+                            src={att.url}
+                            alt={att.name ?? "attachment"}
+                          />
+                        ) : (
+                          <div key={`att-${i}`} className="att-file">
+                            <span className="clip">📎</span>
+                            {att.name ?? "file"}
+                          </div>
+                        )
+                      )}
+                      {message.parts.map((part, i) => {
+                        if (part.type === "text") {
+                          return message.role === "assistant" ? (
+                            <div key={i} className="markdown">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {part.text}
+                              </ReactMarkdown>
+                            </div>
+                          ) : (
+                            <p key={i}>{part.text}</p>
+                          );
+                        }
+                        if (part.type === "tool-invocation") {
+                          const inv = part.toolInvocation;
+                          const awaiting =
+                            inv.state === "call" &&
+                            isSensitiveTool(inv.toolName);
+                          return (
+                            <div key={i} className="tool">
+                              <span className="tool-dot" />
+                              {inv.state === "result"
+                                ? "used"
+                                : awaiting
+                                  ? "wants to use"
+                                  : "using"}{" "}
+                              <code>{inv.toolName}</code>
+                              {awaiting && (
+                                <span className="tool-approve">
+                                  <button
+                                    type="button"
+                                    className="btn-approve"
+                                    onClick={() =>
+                                      approveTool(
+                                        inv.toolCallId,
+                                        inv.toolName,
+                                        inv.args
+                                      )
+                                    }
+                                  >
+                                    Approve
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-deny"
+                                    onClick={() => denyTool(inv.toolCallId)}
+                                  >
+                                    Deny
+                                  </button>
+                                </span>
+                              )}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })}
+                      <div className="msg-actions">
+                        {message.role === "assistant" && (
+                          <button
+                            type="button"
+                            className="msg-action"
+                            onClick={() => copyMessage(message)}
+                            title="Copy message"
+                          >
+                            Copy
+                          </button>
+                        )}
+                        {message.role === "assistant" &&
+                          message.id === lastAssistantId &&
+                          !isBusy && (
+                            <button
+                              type="button"
+                              className="msg-action"
+                              onClick={() => reload()}
+                              title="Regenerate response"
+                            >
+                              Regenerate
+                            </button>
+                          )}
+                        {message.role === "user" && !isBusy && (
+                          <button
+                            type="button"
+                            className="msg-action"
+                            onClick={() => startEdit(message)}
+                            title="Edit & resend"
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </div>
+                    </>
                   )}
-                  {message.parts.map((part, i) => {
-                    if (part.type === "text") {
-                      return message.role === "assistant" ? (
-                        <div key={i} className="markdown">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {part.text}
-                          </ReactMarkdown>
-                        </div>
-                      ) : (
-                        <p key={i}>{part.text}</p>
-                      );
-                    }
-                    if (part.type === "tool-invocation") {
-                      return (
-                        <div key={i} className="tool">
-                          <span className="tool-dot" />
-                          used <code>{part.toolInvocation.toolName}</code>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })}
                 </div>
               </div>
             ))}
@@ -342,22 +571,43 @@ export default function ChatArea({
               rows={1}
               autoFocus
             />
-            <button
-              className="send"
-              type="submit"
-              disabled={isBusy || !canSend}
-              aria-label="Send message"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M12 19V5M12 5l-6 6M12 5l6 6"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
+            {isBusy ? (
+              <button
+                className="send stop"
+                type="button"
+                onClick={() => stop()}
+                aria-label="Stop generating"
+                title="Stop generating"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <rect
+                    x="6"
+                    y="6"
+                    width="12"
+                    height="12"
+                    rx="2"
+                    fill="currentColor"
+                  />
+                </svg>
+              </button>
+            ) : (
+              <button
+                className="send"
+                type="submit"
+                disabled={!canSend}
+                aria-label="Send message"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M12 19V5M12 5l-6 6M12 5l6 6"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            )}
           </div>
 
           <input

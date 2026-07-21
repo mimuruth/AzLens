@@ -1101,3 +1101,154 @@ code {
   color: #15803d;
   border-color: #22c55e66;
 }
+
+/* ---- Approval toggle (topbar) ---- */
+.approval-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 10px;
+  padding: 5px 9px;
+  font-size: 12px;
+  font-family: inherit;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.approval-toggle:hover {
+  border-color: var(--accent);
+}
+
+.approval-toggle.on {
+  color: #15803d;
+  border-color: #22c55e66;
+}
+
+.approval-toggle.off {
+  color: var(--text-muted, #8a8a8a);
+}
+
+/* ---- Per-message action bar (copy / regenerate / edit) ---- */
+.msg-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.msg:hover .msg-actions {
+  opacity: 1;
+}
+
+.msg-action {
+  font-size: 12px;
+  font-family: inherit;
+  padding: 3px 9px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.msg-action:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---- Inline edit box ---- */
+.edit-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.edit-input {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-primary {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover, var(--accent));
+}
+
+.btn-ghost {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* ---- Tool approval prompt ---- */
+.tool-approve {
+  display: inline-flex;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+.btn-approve,
+.btn-deny {
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.btn-approve {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+}
+
+.btn-approve:hover {
+  background: #15803d;
+}
+
+.btn-deny {
+  background: transparent;
+  color: var(--text);
+}
+
+.btn-deny:hover {
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
+/* ---- Stop button ---- */
+.send.stop {
+  background: var(--text);
+  color: var(--surface);
+}

@@ -7,14 +7,19 @@ import {
 import { getMcpTools } from "@/lib/mcp";
 import { getModel } from "@/lib/model";
 import { getAgent } from "@/lib/agents";
-import { resolveAutoModel, lastUserText } from "@/lib/router";
+import {
+  resolveAutoModel,
+  lastUserText,
+  isProviderReachable,
+} from "@/lib/router";
 
 // The MCP client uses Node APIs, so this route must run on the Node.js runtime.
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  const { messages, provider, model, agentId } = await req.json();
+  const { messages, provider, model, agentId, requireApproval } =
+    await req.json();
 
   const agent = getAgent(agentId);
   const coreMessages = convertToCoreMessages(messages);
@@ -24,14 +29,31 @@ export async function POST(req: Request) {
   let chosen: { provider?: string; model?: string } = { provider, model };
   let routed: { tier: string; reason: string } | null = null;
   if (!provider || provider === "auto" || model === "auto") {
-    const decision = resolveAutoModel(
-      lastUserText(coreMessages as CoreMessage[])
-    );
+    const text = lastUserText(coreMessages as CoreMessage[]);
+    let decision = resolveAutoModel(text);
+    // Routing resilience: if we picked a local server that is currently down,
+    // fall back to the next available provider instead of failing the turn.
+    if (
+      decision.provider === "local" &&
+      !(await isProviderReachable("local"))
+    ) {
+      try {
+        const fallback = resolveAutoModel(text, ["local"]);
+        decision = {
+          ...fallback,
+          reason: `${fallback.reason} · local offline`,
+        };
+      } catch {
+        // No alternative provider — keep the local pick; it will error clearly.
+      }
+    }
     chosen = { provider: decision.provider, model: decision.model };
     routed = { tier: decision.tier, reason: decision.reason };
   }
 
-  const { tools, close } = await getMcpTools(agent.servers);
+  const { tools, close } = await getMcpTools(agent.servers, {
+    requireApproval: requireApproval === true,
+  });
 
   return createDataStreamResponse({
     execute: (dataStream) => {

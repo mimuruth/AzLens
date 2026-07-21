@@ -1,6 +1,7 @@
-import { experimental_createMCPClient } from "ai";
+import { experimental_createMCPClient, type ToolSet } from "ai";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { ServerKey } from "@/lib/agents";
+import { isSensitiveTool } from "@/lib/tools";
 
 /**
  * Maps each MCP server key to its Streamable HTTP endpoint (ending in /mcp).
@@ -18,8 +19,15 @@ const SERVER_URLS: Record<ServerKey, string | undefined> = {
  * their tools into a single tool set usable by the model, and return a
  * `close()` to tear down the connections once the response has finished
  * streaming. Pass `servers` to scope an agent to a subset of servers.
+ *
+ * When `requireApproval` is set, mutating ("sensitive") tools have their
+ * `execute` removed so the model's call for them pauses as a client-side tool
+ * call — the UI then asks the user to approve before it runs (via /api/tool).
  */
-export async function getMcpTools(servers?: ServerKey[]) {
+export async function getMcpTools(
+  servers?: ServerKey[],
+  opts?: { requireApproval?: boolean }
+) {
   const keys =
     servers && servers.length > 0
       ? servers
@@ -47,7 +55,17 @@ export async function getMcpTools(servers?: ServerKey[]) {
   const toolSets = await Promise.all(clients.map((client) => client.tools()));
 
   // Tool names are unique across the three servers, so a shallow merge is safe.
-  const tools = Object.assign({}, ...toolSets);
+  const tools: ToolSet = Object.assign({}, ...toolSets);
+
+  // Approval mode: drop `execute` from sensitive tools so the SDK surfaces the
+  // call to the UI for confirmation instead of running it automatically.
+  if (opts?.requireApproval) {
+    for (const name of Object.keys(tools)) {
+      if (isSensitiveTool(name) && tools[name]) {
+        delete (tools[name] as { execute?: unknown }).execute;
+      }
+    }
+  }
 
   async function close(): Promise<void> {
     await Promise.all(clients.map((client) => client.close().catch(() => {})));

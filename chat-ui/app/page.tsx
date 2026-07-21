@@ -23,6 +23,8 @@ import {
   saveModel,
   loadAgentId,
   saveAgentId,
+  loadApproval,
+  saveApproval,
   newId,
 } from "@/lib/storage";
 import { DEFAULT_AGENT_ID } from "@/lib/agents";
@@ -42,6 +44,7 @@ export default function Page() {
   const [providers, setProviders] = useState<ModelProvider[]>([]);
   const [modelSel, setModelSel] = useState<ModelSelection | null>(null);
   const [agentId, setAgentId] = useState<string>(DEFAULT_AGENT_ID);
+  const [requireApproval, setRequireApproval] = useState(true);
   const [prefill, setPrefill] = useState<{
     text: string;
     nonce: number;
@@ -65,6 +68,7 @@ export default function Page() {
     document.documentElement.setAttribute("data-theme", t);
     setTheme(t);
     setAgentId(loadAgentId() ?? DEFAULT_AGENT_ID);
+    setRequireApproval(loadApproval());
     setConversations(list);
     setActiveId(active);
     setReady(true);
@@ -203,6 +207,14 @@ export default function Page() {
     saveAgentId(id);
   }, []);
 
+  const toggleApproval = useCallback(() => {
+    setRequireApproval((prev) => {
+      const next = !prev;
+      saveApproval(next);
+      return next;
+    });
+  }, []);
+
   const useTool = useCallback((text: string) => {
     setPrefill({ text, nonce: Date.now() });
   }, []);
@@ -296,6 +308,8 @@ export default function Page() {
         onSelectModel={changeModel}
         agentId={agentId}
         onSelectAgent={changeAgent}
+        requireApproval={requireApproval}
+        onToggleApproval={toggleApproval}
         prefill={prefill}
         onMessages={handleMessages}
         onToggleSidebar={() => setCollapsed((v) => !v)}
