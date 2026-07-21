@@ -21,7 +21,7 @@
 | `mcp-local-coder`        | MCP server  | Local file system + code search | `read_file`, `write_file`, `search_code`               |
 | `AzLens-mcp`             | MCP server  | Azure ARM / KQL / Wiki          | `query_azure_resource`, `run_kql_query`, `search_wiki` |
 | `mcp-personal-assistant` | MCP server  | Notes + to-do lists             | `get_daily_notes`, `update_todo_list`                  |
-| `chat-ui`                | Next.js app | ChatGPT-style front end         | Azure OpenAI + MCP client over all three servers       |
+| `chat-ui`                | Next.js app | ChatGPT-style front end         | Multi-provider LLM + MCP client over all three servers |
 
 Each MCP server ships **two transports** from a single codebase:
 
@@ -30,7 +30,9 @@ Each MCP server ships **two transports** from a single codebase:
 
 ## Chat UI
 
-A modern, claude.ai-style front end with a collapsible sidebar, **New chat**, search, and multiple conversations you can switch between (persisted in the browser). Each conversation streams responses from Azure OpenAI and can call the MCP tools. It also includes **dark mode**, an **MCP tools health panel** (live online/offline dots), chat **rename** + date grouping, markdown rendering, file/image attachments, and a **⌘K command palette**.
+A modern, claude.ai-style front end with a collapsible sidebar, **New chat**, search, and multiple conversations you can switch between (persisted in the browser). Each conversation streams responses from your chosen model and can call the MCP tools.
+
+Highlights: **multi-provider models** (Azure OpenAI / OpenAI / Anthropic / local LM Studio-style servers) with an **Auto router** that sends simple prompts to a cheap model and complex ones to a powerful model; switchable **agents** (General / Code / Azure / Personal Assistant), each scoped to the right MCP servers; **tool approval** for mutating tools; **stop / regenerate / copy / edit-and-resend**; **dark mode**; an **MCP tools health panel** (live online/offline dots); chat **rename** + date grouping; markdown rendering; file/image attachments; and a **⌘K command palette**.
 
 ![AzLens chat UI in dark mode: sidebar with a pinned chat and date-grouped chats, an MCP tools health panel, a model picker in the top bar, and a conversation with rendered markdown](docs/chat-ui-dark.png)
 
@@ -299,16 +301,23 @@ Auth uses `DefaultAzureCredential`: `az login` locally, managed identity in Azur
 
 ### `chat-ui`
 
-| Variable                     | Description                                                                                                                                                                        |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AZURE_OPENAI_RESOURCE_NAME` | Azure OpenAI resource name (not the full URL)                                                                                                                                      |
-| `AZURE_OPENAI_DEPLOYMENT`    | Chat model deployment name, e.g. `gpt-4o`                                                                                                                                          |
-| `AZURE_OPENAI_API_VERSION`   | API version, e.g. `2024-10-21`                                                                                                                                                     |
-| `AZURE_OPENAI_API_KEY`       | API key (a Container Apps secret in Azure)                                                                                                                                         |
-| `LOCAL_OPENAI_BASE_URL`      | Optional OpenAI-compatible endpoint (LM Studio / Ollama / vLLM), e.g. `http://localhost:1234/v1`. Enables a **Local** provider whose models are auto-discovered from `/v1/models`. |
-| `MCP_LOCAL_CODER_URL`        | `mcp-local-coder` `/mcp` endpoint                                                                                                                                                  |
-| `MCP_AZLENS_URL`             | `AzLens-mcp` `/mcp` endpoint                                                                                                                                                       |
-| `MCP_PERSONAL_ASSISTANT_URL` | `mcp-personal-assistant` `/mcp` endpoint                                                                                                                                           |
+| Variable                       | Description                                                                                                                                                                        |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CHAT_PROVIDER`                | Optional. Force a provider: `azure` / `openai` / `anthropic` / `local`. Otherwise auto-detected from whichever key is set.                                                         |
+| `AZURE_OPENAI_RESOURCE_NAME`   | Azure OpenAI resource name (not the full URL)                                                                                                                                      |
+| `AZURE_OPENAI_DEPLOYMENT`      | Chat model deployment name, e.g. `gpt-4o`                                                                                                                                          |
+| `AZURE_OPENAI_API_VERSION`     | API version, e.g. `2024-10-21`                                                                                                                                                     |
+| `AZURE_OPENAI_API_KEY`         | API key (a Container Apps secret in Azure)                                                                                                                                         |
+| `OPENAI_API_KEY`               | Optional. Enables the OpenAI provider (`OPENAI_MODEL` to override the model).                                                                                                      |
+| `ANTHROPIC_API_KEY`            | Optional. Enables the Anthropic provider (`ANTHROPIC_MODEL` to override the model).                                                                                                |
+| `LOCAL_OPENAI_BASE_URL`        | Optional OpenAI-compatible endpoint (LM Studio / Ollama / vLLM), e.g. `http://localhost:1234/v1`. Enables a **Local** provider whose models are auto-discovered from `/v1/models`. |
+| `LOCAL_MODEL`                  | Optional fallback local model id when `/v1/models` can't be reached; `LOCAL_OPENAI_API_KEY` / `LOCAL_LABEL` are also optional.                                                     |
+| `AUTO_SIMPLE` / `AUTO_COMPLEX` | Optional overrides for the Auto router as `provider:model` (e.g. `anthropic:claude-3-5-sonnet-latest`).                                                                            |
+| `MCP_LOCAL_CODER_URL`          | `mcp-local-coder` `/mcp` endpoint                                                                                                                                                  |
+| `MCP_AZLENS_URL`               | `AzLens-mcp` `/mcp` endpoint                                                                                                                                                       |
+| `MCP_PERSONAL_ASSISTANT_URL`   | `mcp-personal-assistant` `/mcp` endpoint                                                                                                                                           |
+
+> Tool-approval mode is a per-browser UI setting (the **Approvals** toggle), not an environment variable.
 
 ---
 
@@ -442,6 +451,8 @@ Then re-run `az deployment group create` passing the `*Image` parameters (see th
 | mcp-personal-assistant | `get_daily_notes`      | `date` (YYYY-MM-DD)     | Read that day's markdown notes                                                    |
 | mcp-personal-assistant | `update_todo_list`     | `task`, `status`        | Add/update a task (`todo`/`in-progress`/`done`)                                   |
 
+> `write_file` and `update_todo_list` mutate state and are gated by **tool-approval mode** (on by default) — the model must get the user's confirmation before they run. Adjust the list in [chat-ui/lib/tools.ts](chat-ui/lib/tools.ts).
+
 ---
 
 ## Chat UI functionality
@@ -512,7 +523,7 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 
 **MCP servers (dual transport).** Each server's tool logic lives once in `src/server.ts` (`createServer()`), reused by `src/index.ts` (stdio) and `src/http.ts` (Streamable HTTP). The HTTP entry point runs an Express app exposing `POST` / `GET` / `DELETE` on `/mcp` with per-session `StreamableHTTPServerTransport` instances, plus `GET /health`.
 
-**chat-ui as an MCP host.** The `/api/chat` route uses the Vercel AI SDK's `streamText` with tools aggregated from all three MCP servers (via `experimental_createMCPClient` over Streamable HTTP). The model decides when to call a tool; the route executes it, feeds the result back, and streams the final answer. Unreachable MCP servers are skipped so the chat still works without them.
+**chat-ui as an MCP host.** The `/api/chat` route uses the Vercel AI SDK's `streamText` with tools aggregated from the MCP servers in scope for the selected **agent** (via `experimental_createMCPClient` over Streamable HTTP). For the **Auto** model option, a zero-cost heuristic ([chat-ui/lib/router.ts](chat-ui/lib/router.ts)) classifies each prompt and picks a cheap or powerful model, falling back to another provider if the chosen one (e.g. a local server) is offline. The model decides when to call a tool; read-only tools run automatically, while **mutating tools pause for approval** (their `execute` is withheld so the UI can confirm, then `POST /api/tool` runs them). Results feed back and the final answer streams out. Unreachable MCP servers are skipped so the chat still works without them.
 
 **Authentication.**
 
