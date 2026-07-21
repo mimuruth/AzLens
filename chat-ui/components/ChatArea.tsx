@@ -20,6 +20,12 @@ type RouteAnnotation = {
   model?: string;
   routed?: boolean;
   tier?: string;
+  usage?: {
+    promptTokens?: number | null;
+    completionTokens?: number | null;
+    totalTokens?: number | null;
+  };
+  costUsd?: number;
 };
 
 export default function ChatArea({
@@ -232,9 +238,13 @@ export default function ChatArea({
 
   function routeInfo(annotations: unknown): RouteAnnotation | null {
     if (!Array.isArray(annotations) || annotations.length === 0) return null;
-    const a = annotations[annotations.length - 1] as RouteAnnotation;
-    if (!a || (!a.model && !a.agentName)) return null;
-    return a;
+    // The route badge is written first; usage/cost is appended on finish.
+    const merged = Object.assign(
+      {},
+      ...(annotations as RouteAnnotation[])
+    ) as RouteAnnotation;
+    if (!merged || (!merged.model && !merged.agentName)) return null;
+    return merged;
   }
 
   return (
@@ -355,6 +365,25 @@ export default function ChatArea({
                           {info.routed && info.tier && (
                             <span className={`rb-tier ${info.tier}`}>
                               {info.tier}
+                            </span>
+                          )}
+                          {(() => {
+                            const u = info.usage;
+                            const total =
+                              u?.totalTokens ??
+                              (u
+                                ? (u.promptTokens ?? 0) +
+                                  (u.completionTokens ?? 0)
+                                : 0);
+                            return total > 0 ? (
+                              <span className="rb-usage">
+                                {total.toLocaleString()} tokens
+                              </span>
+                            ) : null;
+                          })()}
+                          {info.costUsd != null && (
+                            <span className="rb-cost">
+                              ${info.costUsd.toFixed(4)}
                             </span>
                           )}
                         </div>

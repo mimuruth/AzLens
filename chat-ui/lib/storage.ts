@@ -8,6 +8,10 @@ export type Conversation = {
   renamed?: boolean;
   /** Pinned chats show in a dedicated section above the date groups. */
   pinned?: boolean;
+  /** Agent selected for this conversation (falls back to the global default). */
+  agentId?: string;
+  /** Model selected for this conversation (falls back to the global default). */
+  model?: ModelSelection;
 };
 
 export type Theme = "light" | "dark";

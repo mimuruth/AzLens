@@ -461,7 +461,7 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 
 **Conversations**
 
-- Multiple chats, persisted in the browser (localStorage) and switchable from the sidebar.
+- Multiple chats, persisted in the browser (localStorage) and switchable from the sidebar. Each chat remembers **its own agent and model** selection.
 - Auto-generated titles from the first message; **double-click a chat to rename** it.
 - **Pin** chats to a dedicated section; the rest are grouped by **Today / Yesterday / Previous 7 days / Older**.
 - Delete individual chats or **Clear all chats**.
@@ -473,6 +473,7 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 - **File & image attachments** via the ＋ button (sent as `experimental_attachments`; images are understood by vision-capable models such as `gpt-4o`).
 - Auto-growing composer — **Enter** sends, **Shift+Enter** inserts a newline.
 - **Stop** a streaming response, **Regenerate** the last answer, **Copy** any reply, and **Edit & resend** a previous user message (which trims the turns after it).
+- A small footer under each answer shows the agent, model, routed tier, and — when the provider reports it — **token usage and an estimated cost**.
 - Tool calls are shown inline as chips (e.g. `used search_wiki`).
 
 **Models & routing**
@@ -541,7 +542,7 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 - **Lint & format** — ESLint (`npm run lint`) for the MCP servers, Prettier (`npm run format`), an `.editorconfig`, and a **Husky pre-commit** hook that runs `lint-staged` (formats staged files).
 - **CI** ([.github/workflows/ci.yml](.github/workflows/ci.yml)) — smoke test, ESLint, per-project **build/typecheck + tests**, and **`bicep build`** on every pull request and push.
 - **Security** — [CodeQL](.github/workflows/codeql.yml) code scanning, [Trivy](.github/workflows/security-scan.yml) image scanning of all four containers, and [Dependabot](.github/dependabot.yml) updates for npm, Docker, and GitHub Actions.
-- **Observability** — set `APPLICATIONINSIGHTS_CONNECTION_STRING` and all four apps export traces, logs, and metrics to **Application Insights** via `@azure/monitor-opentelemetry` (servers: `src/telemetry.ts`; chat-ui: `instrumentation.ts`). The Bicep provisions a workspace-based Application Insights resource and injects the connection string automatically. Leave it unset to disable.
+- **Observability** — set `APPLICATIONINSIGHTS_CONNECTION_STRING` and all four apps export traces, logs, and metrics to **Application Insights** via `@azure/monitor-opentelemetry` (servers: `src/telemetry.ts`; chat-ui: `instrumentation.ts`). The chat route also emits a custom **`chat.turn`** span per reply with the agent, provider, model, routed tier, and token counts. The Bicep provisions a workspace-based Application Insights resource and injects the connection string automatically. Leave it unset to disable.
 - **Internal-only MCP option** — deploy with `mcpIngressExternal=false` to keep the MCP servers internal to the Container Apps environment (reachable only by `chat-ui`).
 
 ---

@@ -12,6 +12,8 @@ import {
   lastUserText,
   isProviderReachable,
 } from "@/lib/router";
+import { estimateCost } from "@/lib/pricing";
+import { recordChatTurn } from "@/lib/telemetry-events";
 
 // The MCP client uses Node APIs, so this route must run on the Node.js runtime.
 export const runtime = "nodejs";
@@ -75,8 +77,36 @@ export async function POST(req: Request) {
         tools,
         // Allow the model to call tools and then continue reasoning.
         maxSteps: 5,
-        // Close the MCP connections once the full response has been produced.
-        onFinish: async () => {
+        // On completion: report token usage + estimated cost to the UI, emit a
+        // telemetry span, and close the MCP connections.
+        // On completion: report token usage + estimated cost to the UI, emit a
+        // telemetry span, and close the MCP connections. Some providers don't
+        // report usage for streamed responses; those values stay null.
+        onFinish: async ({ usage }) => {
+          const finite = (n: unknown): number | null =>
+            typeof n === "number" && Number.isFinite(n) ? n : null;
+          const promptTokens = finite(usage?.promptTokens);
+          const completionTokens = finite(usage?.completionTokens);
+          const totalTokens =
+            finite(usage?.totalTokens) ??
+            (promptTokens != null || completionTokens != null
+              ? (promptTokens ?? 0) + (completionTokens ?? 0)
+              : null);
+          const costUsd = estimateCost(chosen.model, usage);
+
+          dataStream.writeMessageAnnotation({
+            usage: { promptTokens, completionTokens, totalTokens },
+            ...(costUsd != null ? { costUsd } : {}),
+          });
+          recordChatTurn({
+            agent: agent.id,
+            provider: chosen.provider ?? "",
+            model: chosen.model ?? "",
+            tier: routed?.tier ?? "explicit",
+            promptTokens: promptTokens ?? 0,
+            completionTokens: completionTokens ?? 0,
+            ...(costUsd != null ? { costUsd } : {}),
+          });
           await close();
         },
       });

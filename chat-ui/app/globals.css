@@ -1102,6 +1102,12 @@ code {
   border-color: #22c55e66;
 }
 
+.rb-usage,
+.rb-cost {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-muted, #8a8a8a);
+}
+
 /* ---- Approval toggle (topbar) ---- */
 .approval-toggle {
   display: inline-flex;

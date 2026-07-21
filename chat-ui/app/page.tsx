@@ -51,6 +51,9 @@ export default function Page() {
   } | null>(null);
   const [ready, setReady] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
+  // Mirror of conversations for stable reads inside effects/callbacks.
+  const conversationsRef = useRef<Conversation[]>([]);
+  conversationsRef.current = conversations;
 
   // Load persisted state on mount (client only, avoids hydration mismatch).
   useEffect(() => {
@@ -118,6 +121,16 @@ export default function Page() {
     setConversations(list);
     saveConversations(list);
   }, []);
+
+  // When the active chat changes, apply that chat's saved agent/model (or fall
+  // back to the global defaults for chats that don't have their own).
+  useEffect(() => {
+    if (!ready) return;
+    const convo = conversationsRef.current.find((c) => c.id === activeId);
+    setAgentId(convo?.agentId ?? loadAgentId() ?? DEFAULT_AGENT_ID);
+    const m = convo?.model ?? loadModel();
+    if (m) setModelSel(m);
+  }, [activeId, ready]);
 
   const newChat = useCallback(() => {
     const id = newId();
@@ -197,15 +210,35 @@ export default function Page() {
     });
   }, []);
 
-  const changeModel = useCallback((sel: ModelSelection) => {
-    setModelSel(sel);
-    saveModel(sel);
-  }, []);
+  const changeModel = useCallback(
+    (sel: ModelSelection) => {
+      setModelSel(sel);
+      saveModel(sel); // global default for future new chats
+      setConversations((prev) => {
+        const list = prev.map((c) =>
+          c.id === activeId ? { ...c, model: sel } : c
+        );
+        saveConversations(list);
+        return list;
+      });
+    },
+    [activeId]
+  );
 
-  const changeAgent = useCallback((id: string) => {
-    setAgentId(id);
-    saveAgentId(id);
-  }, []);
+  const changeAgent = useCallback(
+    (id: string) => {
+      setAgentId(id);
+      saveAgentId(id); // global default for future new chats
+      setConversations((prev) => {
+        const list = prev.map((c) =>
+          c.id === activeId ? { ...c, agentId: id } : c
+        );
+        saveConversations(list);
+        return list;
+      });
+    },
+    [activeId]
+  );
 
   const toggleApproval = useCallback(() => {
     setRequireApproval((prev) => {
