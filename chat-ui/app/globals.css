@@ -537,6 +537,127 @@ code {
   color: inherit;
 }
 
+/* ---- Code block with copy button + syntax highlighting ---- */
+.code-block {
+  position: relative;
+  margin: 0 0 12px;
+}
+
+.code-block pre {
+  margin: 0;
+}
+
+.code-copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: #d8d6cf;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.12s ease,
+    background 0.12s ease;
+}
+
+.code-block:hover .code-copy {
+  opacity: 1;
+}
+
+.code-copy:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* highlight.js token palette (tuned for the dark code background) */
+.hljs-comment,
+.hljs-quote {
+  color: #9aa0a6;
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-name,
+.hljs-tag {
+  color: #f0a5c0;
+}
+.hljs-string,
+.hljs-title,
+.hljs-section,
+.hljs-attribute,
+.hljs-literal,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-addition {
+  color: #a6e3a1;
+}
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link,
+.hljs-meta,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: #f9c784;
+}
+.hljs-variable,
+.hljs-params {
+  color: #8ec8ff;
+}
+.hljs-function .hljs-title,
+.hljs-attr {
+  color: #8ec8ff;
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 600;
+}
+
+/* ---- Per-conversation instructions panel ---- */
+.instructions-panel {
+  margin: 0 auto;
+  max-width: 760px;
+  width: calc(100% - 32px);
+  padding: 14px 16px;
+  background: var(--surface, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.instructions-panel label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.instructions-input {
+  width: 100%;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.instructions-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .markdown table {
   width: 100%;
   border-collapse: collapse;

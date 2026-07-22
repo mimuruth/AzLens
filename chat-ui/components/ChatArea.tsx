@@ -1,10 +1,11 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { UIMessage } from "ai";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
 import {
   loadMessages,
   type ModelProvider,
@@ -131,6 +132,44 @@ function ToolCard({
   );
 }
 
+/** A code block with a copy button; the inner <code> is highlighted by rehype. */
+function CodeBlock({ children }: { children?: ReactNode }) {
+  const ref = useRef<HTMLPreElement>(null);
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(ref.current?.innerText ?? "");
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
+  return (
+    <div className="code-block">
+      <button type="button" className="code-copy" onClick={copy}>
+        {copied ? "Copied" : "Copy"}
+      </button>
+      <pre ref={ref}>{children}</pre>
+    </div>
+  );
+}
+
+/** Assistant markdown with GitHub-flavoured tables and highlighted code. */
+function MessageMarkdown({ text }: { text: string }) {
+  return (
+    <div className="markdown">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[[rehypeHighlight, { ignoreMissing: true }]]}
+        components={{ pre: (props) => <CodeBlock>{props.children}</CodeBlock> }}
+      >
+        {text}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
 export default function ChatArea({
   id,
   providers,
@@ -140,6 +179,8 @@ export default function ChatArea({
   onSelectAgent,
   requireApproval,
   onToggleApproval,
+  instructions,
+  onSetInstructions,
   prefill,
   onMessages,
   onToggleSidebar,
@@ -152,6 +193,8 @@ export default function ChatArea({
   onSelectAgent: (id: string) => void;
   requireApproval: boolean;
   onToggleApproval: () => void;
+  instructions: string;
+  onSetInstructions: (text: string) => void;
   prefill: { text: string; nonce: number } | null;
   onMessages: (id: string, messages: UIMessage[]) => void;
   onToggleSidebar: () => void;
@@ -164,6 +207,8 @@ export default function ChatArea({
   modelRef.current = modelSelection;
   const approvalRef = useRef(requireApproval);
   approvalRef.current = requireApproval;
+  const instructionsRef = useRef(instructions);
+  instructionsRef.current = instructions;
 
   const {
     messages,
@@ -187,6 +232,9 @@ export default function ChatArea({
       messages,
       agentId: agentIdRef.current,
       requireApproval: approvalRef.current,
+      ...(instructionsRef.current
+        ? { instructions: instructionsRef.current }
+        : {}),
       ...(modelRef.current
         ? { provider: modelRef.current.provider, model: modelRef.current.model }
         : {}),
@@ -201,6 +249,8 @@ export default function ChatArea({
   const [attachments, setAttachments] = useState<File[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
+  const [instrOpen, setInstrOpen] = useState(false);
+  const [instrDraft, setInstrDraft] = useState(instructions);
 
   const canSend = input.trim().length > 0 || attachments.length > 0;
 
@@ -445,7 +495,73 @@ export default function ChatArea({
             )}
           </select>
         )}
+        <button
+          type="button"
+          className={`approval-toggle ${instructions ? "on" : "off"}`}
+          onClick={() => {
+            setInstrDraft(instructions);
+            setInstrOpen((o) => !o);
+          }}
+          aria-pressed={instrOpen}
+          title="Per-conversation instructions"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M4 6h16M4 12h16M4 18h10"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            />
+          </svg>
+          Instructions
+        </button>
       </header>
+
+      {instrOpen && (
+        <div className="instructions-panel">
+          <label htmlFor="conv-instructions">
+            Instructions for this conversation
+          </label>
+          <textarea
+            id="conv-instructions"
+            className="instructions-input"
+            value={instrDraft}
+            onChange={(e) => setInstrDraft(e.target.value)}
+            rows={4}
+            placeholder="e.g. Always answer in TypeScript and cite Azure docs."
+          />
+          <div className="instructions-actions">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => {
+                onSetInstructions(instrDraft.trim());
+                setInstrOpen(false);
+              }}
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => {
+                setInstrDraft("");
+                onSetInstructions("");
+                setInstrOpen(false);
+              }}
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => setInstrOpen(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className={`conversation ${isEmpty ? "is-empty" : ""}`}>
         {isEmpty ? (
@@ -562,11 +678,7 @@ export default function ChatArea({
                       {message.parts.map((part, i) => {
                         if (part.type === "text") {
                           return message.role === "assistant" ? (
-                            <div key={i} className="markdown">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                {part.text}
-                              </ReactMarkdown>
-                            </div>
+                            <MessageMarkdown key={i} text={part.text} />
                           ) : (
                             <p key={i}>{part.text}</p>
                           );

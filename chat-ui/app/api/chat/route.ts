@@ -14,17 +14,36 @@ import {
 } from "@/lib/router";
 import { estimateCost } from "@/lib/pricing";
 import { recordChatTurn } from "@/lib/telemetry-events";
+import { rateLimit, callerKey } from "@/lib/rate-limit";
 
 // The MCP client uses Node APIs, so this route must run on the Node.js runtime.
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  const { messages, provider, model, agentId, requireApproval } =
+  // Optional per-caller rate limit (requests/min). 0 (default) disables it.
+  const limit = Number(process.env.RATE_LIMIT_PER_MIN ?? 0);
+  if (limit > 0) {
+    const gate = rateLimit(callerKey(new Headers(req.headers)), limit);
+    if (!gate.ok) {
+      return new Response(
+        "Rate limit exceeded. Please wait a moment and try again.",
+        { status: 429, headers: { "Retry-After": String(gate.retryAfter) } }
+      );
+    }
+  }
+
+  const { messages, provider, model, agentId, requireApproval, instructions } =
     await req.json();
 
   const agent = getAgent(agentId);
   const coreMessages = convertToCoreMessages(messages);
+
+  // Per-conversation instructions (if any) refine the agent's base prompt.
+  const systemPrompt =
+    typeof instructions === "string" && instructions.trim().length > 0
+      ? `${agent.systemPrompt}\n\nAdditional instructions for this conversation:\n${instructions.trim()}`
+      : agent.systemPrompt;
 
   // Decide the model. An explicit picker choice wins; "auto" (or no choice)
   // routes by task complexity across whatever providers are configured.
@@ -72,7 +91,7 @@ export async function POST(req: Request) {
 
       const result = streamText({
         model: getModel(chosen),
-        system: agent.systemPrompt,
+        system: systemPrompt,
         messages: coreMessages,
         tools,
         // Allow the model to call tools and then continue reasoning.

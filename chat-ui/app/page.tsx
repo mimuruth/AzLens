@@ -331,6 +331,21 @@ export default function Page() {
     []
   );
 
+  const changeInstructions = useCallback(
+    (text: string) => {
+      setConversations((prev) => {
+        const list = prev.map((c) =>
+          c.id === activeId ? { ...c, instructions: text } : c
+        );
+        saveConversations(list);
+        const updated = list.find((c) => c.id === activeId);
+        if (updated) cloudSave(updated, loadMessages(activeId));
+        return list;
+      });
+    },
+    [activeId]
+  );
+
   // Persist messages and keep the conversation title/order in sync.
   const handleMessages = useCallback((id: string, messages: UIMessage[]) => {
     saveMessages(id, messages);
@@ -358,6 +373,9 @@ export default function Page() {
   }, []);
 
   if (!ready) return null;
+
+  const activeInstructions =
+    conversations.find((c) => c.id === activeId)?.instructions ?? "";
 
   return (
     <div className={`layout ${collapsed ? "collapsed" : ""}`}>
@@ -387,6 +405,8 @@ export default function Page() {
         onSelectAgent={changeAgent}
         requireApproval={requireApproval}
         onToggleApproval={toggleApproval}
+        instructions={activeInstructions}
+        onSetInstructions={changeInstructions}
         prefill={prefill}
         onMessages={handleMessages}
         onToggleSidebar={() => setCollapsed((v) => !v)}

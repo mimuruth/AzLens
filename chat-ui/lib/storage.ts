@@ -12,6 +12,8 @@ export type Conversation = {
   agentId?: string;
   /** Model selected for this conversation (falls back to the global default). */
   model?: ModelSelection;
+  /** Optional per-conversation system instructions appended to the agent prompt. */
+  instructions?: string;
 };
 
 export type Theme = "light" | "dark";
