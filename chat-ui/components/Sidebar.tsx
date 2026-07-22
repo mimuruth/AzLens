@@ -86,6 +86,16 @@ const SERVER_TOOLS: Record<string, { name: string; example: string }[]> = {
       example: "List my Azure budgets and current spend",
     },
   ],
+  "mcp-knowledge": [
+    {
+      name: "search_knowledge",
+      example: "Search the knowledge base for our data retention policy",
+    },
+    {
+      name: "get_document",
+      example: "Get the knowledge base document with key doc-42",
+    },
+  ],
 };
 
 export default function Sidebar({

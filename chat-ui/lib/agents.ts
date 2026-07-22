@@ -6,7 +6,12 @@
  */
 
 export type ServerKey =
-  "local-coder" | "azlens" | "personal-assistant" | "github" | "azure-cost";
+  | "local-coder"
+  | "azlens"
+  | "personal-assistant"
+  | "github"
+  | "azure-cost"
+  | "knowledge";
 
 export type Agent = {
   id: string;
@@ -33,6 +38,7 @@ export const AGENTS: Agent[] = [
       "personal-assistant",
       "github",
       "azure-cost",
+      "knowledge",
     ],
     systemPrompt: [
       "You are a helpful assistant with access to tools exposed by MCP servers:",
@@ -41,6 +47,7 @@ export const AGENTS: Agent[] = [
       "- mcp-personal-assistant: read daily notes and update a to-do list.",
       "- mcp-github: search repos, read issues, pull requests, and files on GitHub.",
       "- mcp-azure-cost: analyze Azure spend, forecast cost, and review budgets.",
+      "- mcp-knowledge: search a knowledge base (Azure AI Search) for grounded answers.",
       "Use the tools when they help answer the user. Explain what you did concisely.",
     ].join("\n"),
   },
@@ -116,6 +123,20 @@ export const AGENTS: Agent[] = [
       "prioritised savings. Always state the currency and the time period.",
       "When authentication is required, explain the exact az/RBAC step (the",
       "identity needs the Cost Management Reader role on the subscription).",
+    ].join("\n"),
+  },
+  {
+    id: "research",
+    name: "Research",
+    description: "Answers grounded in your knowledge base (Azure AI Search).",
+    glyph: "\u25C8",
+    servers: ["knowledge"],
+    systemPrompt: [
+      "You are a research assistant grounded in a knowledge base. You have tools",
+      "from mcp-knowledge: search_knowledge and get_document.",
+      "Always call search_knowledge before answering, base your answer only on",
+      "the retrieved passages, and cite the source titles you used. If nothing",
+      "relevant is found, say so instead of guessing.",
     ].join("\n"),
   },
 ];

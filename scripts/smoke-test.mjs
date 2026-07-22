@@ -255,6 +255,37 @@ async function testAzureCost() {
   }
 }
 
+async function testKnowledge() {
+  console.log("\nmcp-knowledge (offline checks only)");
+  const client = await connect("mcp-knowledge", {});
+  try {
+    const names = toolNames(await client.listTools());
+    check(
+      "lists search_knowledge, get_document",
+      ["search_knowledge", "get_document"].every((n) => names.includes(n)),
+      names.join(", ")
+    );
+    const prompts = (await client.listPrompts()).prompts.map((p) => p.name);
+    check(
+      "lists prompt rag-answer",
+      prompts.includes("rag-answer"),
+      prompts.join(", ")
+    );
+    const res = await client.callTool({
+      name: "search_knowledge",
+      arguments: { query: "test" },
+    });
+    const out = textOf(res);
+    check(
+      "search_knowledge returns a graceful message without a search index",
+      out.length > 0,
+      out.slice(0, 60)
+    );
+  } finally {
+    await client.close();
+  }
+}
+
 async function main() {
   console.log("Running MCP smoke tests…");
   for (const test of [
@@ -263,6 +294,7 @@ async function main() {
     testAzLens,
     testGitHub,
     testAzureCost,
+    testKnowledge,
   ]) {
     try {
       await test();

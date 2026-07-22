@@ -53,6 +53,7 @@ jobs:
           - mcp-personal-assistant
           - mcp-github
           - mcp-azure-cost
+          - mcp-knowledge
           - chat-ui
     steps:
       - uses: actions/checkout@v4

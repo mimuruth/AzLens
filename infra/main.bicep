@@ -38,6 +38,19 @@ param githubImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 @description('Container image for mcp-azure-cost.')
 param azureCostImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
+@description('Container image for mcp-knowledge (RAG over Azure AI Search).')
+param knowledgeImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+
+@description('Azure AI Search endpoint for mcp-knowledge, e.g. https://<svc>.search.windows.net.')
+param azureSearchEndpoint string = ''
+
+@description('Azure AI Search index name for mcp-knowledge.')
+param azureSearchIndex string = ''
+
+@description('Optional Azure AI Search query API key. Leave empty to use the managed identity (Search Index Data Reader).')
+@secure()
+param azureSearchApiKey string = ''
+
 @description('Optional GitHub token for mcp-github (higher rate limit / private repos).')
 @secure()
 param githubToken string = ''
@@ -196,6 +209,14 @@ resource kvAadSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (useKey
   }
 }
 
+resource kvSearchSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (useKeyVault && !empty(azureSearchApiKey)) {
+  parent: keyVault
+  name: 'search-api-key'
+  properties: {
+    value: azureSearchApiKey
+  }
+}
+
 // Secret entries (inline value vs Key Vault reference) reused by the apps below.
 var githubTokenSecrets = empty(githubToken)
   ? []
@@ -254,6 +275,28 @@ var aadSecrets = !enableAuth
             name: 'aad-client-secret'
             value: entraClientSecret
           }
+    ]
+var searchApiKeySecrets = empty(azureSearchApiKey)
+  ? []
+  : [
+      useKeyVault
+        ? {
+            name: 'search-api-key'
+            keyVaultUrl: '${keyVaultUri}secrets/search-api-key'
+            identity: identity.id
+          }
+        : {
+            name: 'search-api-key'
+            value: azureSearchApiKey
+          }
+    ]
+var searchApiKeyEnv = empty(azureSearchApiKey)
+  ? []
+  : [
+      {
+        name: 'AZURE_SEARCH_API_KEY'
+        secretRef: 'search-api-key'
+      }
     ]
 
 // ---------------------------------------------------------------------------
@@ -549,6 +592,51 @@ module azureCost 'container-app.bicep' = {
   ]
 }
 
+module knowledge 'container-app.bicep' = {
+  name: 'mcp-knowledge'
+  params: {
+    name: 'mcp-knowledge'
+    location: location
+    environmentId: acaEnvironment.id
+    identityId: identity.id
+    acrLoginServer: acr.properties.loginServer
+    image: knowledgeImage
+    targetPort: targetPort
+    externalIngress: mcpIngressExternal
+    secrets: searchApiKeySecrets
+    envVars: concat(
+      [
+        {
+          name: 'PORT'
+          value: string(targetPort)
+        }
+        {
+          name: 'AZURE_SEARCH_ENDPOINT'
+          value: azureSearchEndpoint
+        }
+        {
+          name: 'AZURE_SEARCH_INDEX'
+          value: azureSearchIndex
+        }
+        {
+          name: 'AZURE_CLIENT_ID'
+          value: identity.properties.clientId
+        }
+        {
+          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+          value: appInsights.properties.ConnectionString
+        }
+      ],
+      searchApiKeyEnv
+    )
+  }
+  dependsOn: [
+    acrPull
+    kvSecretsUser
+    kvSearchSecret
+  ]
+}
+
 // ---------------------------------------------------------------------------
 // chat-ui — ChatGPT-style front end (Azure OpenAI + MCP client).
 // Declared inline (not via the shared module) because it needs secrets and,
@@ -635,6 +723,10 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
                 value: '${azureCost.outputs.fqdn}/mcp'
               }
               {
+                name: 'MCP_KNOWLEDGE_URL'
+                value: '${knowledge.outputs.fqdn}/mcp'
+              }
+              {
                 name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
                 value: appInsights.properties.ConnectionString
               }
@@ -714,5 +806,6 @@ output azLensUrl string = azLens.outputs.fqdn
 output personalAssistantUrl string = personalAssistant.outputs.fqdn
 output githubUrl string = github.outputs.fqdn
 output azureCostUrl string = azureCost.outputs.fqdn
+output knowledgeUrl string = knowledge.outputs.fqdn
 output cosmosAccountName string = deployCosmos ? cosmosAccountName : ''
 output chatUiUrl string = 'https://${chatUi.properties.configuration.ingress.fqdn}'
