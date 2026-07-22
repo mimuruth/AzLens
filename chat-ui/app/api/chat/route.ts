@@ -130,6 +130,17 @@ export async function POST(req: Request) {
           "(You can also pick a different model in the top-right picker.)"
         );
       }
+      if (
+        /model|does not exist|not found|unknown model|invalid model|404/i.test(
+          msg
+        )
+      ) {
+        return (
+          `The model "${chosen.model}" isn't available on ${chosen.provider}. ` +
+          "Pick a different model in the top-right picker (or choose Auto). " +
+          `Original error: ${msg}`
+        );
+      }
       return msg;
     },
   });

@@ -30,6 +30,66 @@ async function discoverLocalModels(baseUrl: string): Promise<string[]> {
   }
 }
 
+/** Merge curated + discovered ids, de-duplicated, curated entries kept first. */
+function mergeModels(curated: string[], discovered: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const id of [...curated, ...discovered]) {
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      out.push(id);
+    }
+  }
+  return out;
+}
+
+/** Discover OpenAI chat models via GET /v1/models. Returns [] on any failure. */
+async function discoverOpenAiModels(): Promise<string[]> {
+  try {
+    const res = await fetch("https://api.openai.com/v1/models", {
+      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+      signal: AbortSignal.timeout(2500),
+    });
+    if (!res.ok) return [];
+    const json = (await res.json()) as { data?: { id?: string }[] };
+    return (json.data ?? [])
+      .map((m) => m.id)
+      .filter((id): id is string => !!id)
+      .filter((id) => /^(gpt|o[134])/.test(id))
+      .filter(
+        (id) =>
+          !/(embedding|whisper|tts|audio|dall|image|moderation|realtime|search|transcribe)/.test(
+            id
+          )
+      )
+      .sort((a, b) => b.localeCompare(a));
+  } catch {
+    return [];
+  }
+}
+
+/** Discover Anthropic models via GET /v1/models. Returns [] on any failure. */
+async function discoverAnthropicModels(): Promise<string[]> {
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/models", {
+      headers: {
+        "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
+        "anthropic-version": "2023-06-01",
+      },
+      signal: AbortSignal.timeout(2500),
+    });
+    if (!res.ok) return [];
+    const json = (await res.json()) as { data?: { id?: string }[] };
+    return (json.data ?? [])
+      .map((m) => m.id)
+      .filter((id): id is string => !!id)
+      .filter((id) => id.startsWith("claude"))
+      .sort((a, b) => b.localeCompare(a));
+  } catch {
+    return [];
+  }
+}
+
 export async function GET(): Promise<Response> {
   const providers: Provider[] = [];
 
@@ -41,17 +101,33 @@ export async function GET(): Promise<Response> {
     });
   }
   if (process.env.OPENAI_API_KEY) {
+    const curated = [
+      "gpt-5.6-sol",
+      "gpt-5.6-terra",
+      "gpt-4o",
+      "gpt-4o-mini",
+      "o3-mini",
+    ];
+    const discovered = await discoverOpenAiModels();
     providers.push({
       id: "openai",
       label: "OpenAI",
-      models: ["gpt-4o", "gpt-4o-mini", "o3-mini"],
+      models: mergeModels(curated, discovered),
     });
   }
   if (process.env.ANTHROPIC_API_KEY) {
+    const curated = [
+      "claude-opus-4-8",
+      "claude-sonnet-5",
+      "fable-5",
+      "claude-3-5-sonnet-latest",
+      "claude-3-5-haiku-latest",
+    ];
+    const discovered = await discoverAnthropicModels();
     providers.push({
       id: "anthropic",
       label: "Anthropic",
-      models: ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"],
+      models: mergeModels(curated, discovered),
     });
   }
   if (process.env.LOCAL_OPENAI_BASE_URL) {

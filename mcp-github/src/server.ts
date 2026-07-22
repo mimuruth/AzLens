@@ -29,8 +29,32 @@ async function gh<T = unknown>(
   };
   if (GITHUB_TOKEN) headers.Authorization = `Bearer ${GITHUB_TOKEN}`;
 
-  const res = await fetch(url, { headers });
-  if (!res.ok) {
+  // Retry transient failures (network errors, 5xx, and rate-limit responses)
+  // with exponential backoff, honouring GitHub's Retry-After header when given.
+  const MAX_ATTEMPTS = 3;
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(url, { headers, signal: AbortSignal.timeout(15000) });
+    } catch (err) {
+      lastError = err;
+      if (attempt < MAX_ATTEMPTS) {
+        await sleep(backoffMs(attempt));
+        continue;
+      }
+      throw err instanceof Error ? err : new Error(String(err));
+    }
+
+    if (res.ok) return (await res.json()) as T;
+
+    const retryable =
+      res.status >= 500 || res.status === 429 || isRateLimited(res);
+    if (retryable && attempt < MAX_ATTEMPTS) {
+      await sleep(retryAfterMs(res) ?? backoffMs(attempt));
+      continue;
+    }
+
     const body = await res.text().catch(() => "");
     let message = `GitHub API ${res.status} ${res.statusText}`;
     try {
@@ -39,12 +63,43 @@ async function gh<T = unknown>(
     } catch {
       /* non-JSON error body */
     }
-    if (res.status === 403 && !GITHUB_TOKEN) {
+    if ((res.status === 403 || res.status === 429) && !GITHUB_TOKEN) {
       message += " (set GITHUB_TOKEN to raise the rate limit).";
     }
     throw new Error(message);
   }
-  return (await res.json()) as T;
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("GitHub API request failed after retries.");
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Exponential backoff with jitter: ~500ms, ~1s, ~2s. */
+function backoffMs(attempt: number): number {
+  return Math.round(2 ** (attempt - 1) * 500 * (0.75 + Math.random() * 0.5));
+}
+
+/** A 403/429 with the primary rate limit exhausted (remaining === 0). */
+function isRateLimited(res: Response): boolean {
+  return (
+    (res.status === 403 || res.status === 429) &&
+    res.headers.get("x-ratelimit-remaining") === "0"
+  );
+}
+
+/** Parse Retry-After (seconds) or X-RateLimit-Reset (epoch seconds) → ms. */
+function retryAfterMs(res: Response): number | null {
+  const retryAfter = res.headers.get("retry-after");
+  if (retryAfter && /^\d+$/.test(retryAfter)) {
+    return Math.min(Number(retryAfter) * 1000, 10000);
+  }
+  const reset = res.headers.get("x-ratelimit-reset");
+  if (reset && /^\d+$/.test(reset)) {
+    const ms = Number(reset) * 1000 - Date.now();
+    if (ms > 0) return Math.min(ms, 10000);
+  }
+  return null;
 }
 
 function text(value: string) {
