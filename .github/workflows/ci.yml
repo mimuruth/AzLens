@@ -52,6 +52,7 @@ jobs:
           - AzLens-mcp
           - mcp-personal-assistant
           - mcp-github
+          - mcp-azure-cost
           - chat-ui
     steps:
       - uses: actions/checkout@v4

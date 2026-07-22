@@ -22,7 +22,8 @@
 | `AzLens-mcp`             | MCP server  | Azure ARM / KQL / Wiki             | `query_azure_resource`, `run_kql_query`, `search_wiki`                                                                                                                     |
 | `mcp-personal-assistant` | MCP server  | Notes + to-do lists                | `get_daily_notes`, `update_todo_list`                                                                                                                                      |
 | `mcp-github`             | MCP server  | GitHub repos / issues / PRs / code | `search_repositories`, `get_repository`, `list_issues`, `get_issue`, `list_pull_requests`, `get_file_contents`, `create_issue`, `add_issue_comment`, `create_pull_request` |
-| `chat-ui`                | Next.js app | ChatGPT-style front end            | Multi-provider LLM + MCP client over all four servers                                                                                                                      |
+| `mcp-azure-cost`         | MCP server  | Azure cost analysis (FinOps)       | `query_cost`, `get_cost_forecast`, `list_budgets`                                                                                                                          |
+| `chat-ui`                | Next.js app | ChatGPT-style front end            | Multi-provider LLM + MCP client over all five servers                                                                                                                      |
 
 Each MCP server ships **two transports** from a single codebase:
 
@@ -33,7 +34,7 @@ Each MCP server ships **two transports** from a single codebase:
 
 A modern, claude.ai-style front end with a collapsible sidebar, **New chat**, search, and multiple conversations you can switch between (persisted in the browser). Each conversation streams responses from your chosen model and can call the MCP tools.
 
-Highlights: **multi-provider models** (Azure OpenAI / OpenAI / Anthropic / local LM Studio-style servers) — cloud model lists are **auto-discovered** from each provider's `/models` API (with a curated fallback) — plus an **Auto router** that sends simple prompts to a cheap model and complex ones to a powerful model; a per-turn **usage & cost** footer (prices overridable via `PRICES_JSON`); switchable **agents** (General / Code / Azure / Personal Assistant / GitHub), each scoped to the right MCP servers; **tool approval** for mutating tools (including GitHub `create_issue` / `create_pull_request`); **stop / regenerate / copy / edit-and-resend**; **dark mode**; an **MCP tools health panel** (live online/offline dots); chat **rename** + date grouping; markdown rendering; file/image attachments; and a **⌘K command palette**.
+Highlights: **multi-provider models** (Azure OpenAI / OpenAI / Anthropic / local LM Studio-style servers) — cloud model lists are **auto-discovered** from each provider's `/models` API (with a curated fallback) — plus an **Auto router** that sends simple prompts to a cheap model and complex ones to a powerful model; a per-turn **usage & cost** footer (prices overridable via `PRICES_JSON`); switchable **agents** (General / Code / Azure / Personal Assistant / GitHub / FinOps), each scoped to the right MCP servers; **tool approval** for mutating tools (including GitHub `create_issue` / `create_pull_request`); **stop / regenerate / copy / edit-and-resend**; **dark mode**; an **MCP tools health panel** (live online/offline dots); chat **rename** + date grouping; markdown rendering; file/image attachments; and a **⌘K command palette**.
 
 ![AzLens chat UI in dark mode: sidebar with a pinned chat and date-grouped chats, an MCP tools health panel, a model picker in the top bar, and a conversation with rendered markdown](docs/chat-ui-hero.png)
 
@@ -193,8 +194,10 @@ cd AzLens-mcp             && PORT=3002 npm run start:http
 cd mcp-personal-assistant && PORT=3003 npm run start:http
 # terminal 4 (GitHub — set GITHUB_TOKEN to enable private repos + write tools)
 cd mcp-github             && PORT=3004 npm run start:http
+# terminal 5 (Azure cost — needs az login + Cost Management Reader)
+cd mcp-azure-cost         && PORT=3005 npm run start:http
 
-# terminal 5
+# terminal 6
 cd chat-ui
 cp .env.example .env.local   # fill in Azure OpenAI + the MCP_*_URL values above
 npm install
@@ -257,18 +260,19 @@ You can also point the Inspector at `http://localhost:3001/mcp` using the **Stre
 
 ### Step 4 — Full end-to-end (chat UI)
 
-Requires an **Azure OpenAI** resource + chat model deployment. Run the four servers on distinct ports, then the UI:
+Requires an **Azure OpenAI** resource + chat model deployment. Run the five servers on distinct ports, then the UI:
 
 ```bash
-# four terminals
+# five terminals
 cd mcp-local-coder        && PORT=3001 npm run start:http
 cd AzLens-mcp             && PORT=3002 npm run start:http
 cd mcp-personal-assistant && PORT=3003 npm run start:http
 cd mcp-github             && PORT=3004 npm run start:http
+cd mcp-azure-cost         && PORT=3005 npm run start:http
 
-# fifth terminal
+# sixth terminal
 cd chat-ui
-cp .env.example .env.local   # set AZURE_OPENAI_* and MCP_*_URL to :3001/3002/3003/3004
+cp .env.example .env.local   # set AZURE_OPENAI_* and MCP_*_URL to :3001/3002/3003/3004/3005
 npm install
 npm run dev                  # http://localhost:3000
 ```
@@ -319,6 +323,15 @@ Auth uses `DefaultAzureCredential`: `az login` locally, managed identity in Azur
 | `GITHUB_TOKEN` | —       | Optional for reads (raises the rate limit to 5000/h and allows private repos). **Required** for the write tools (`create_issue`, `add_issue_comment`, `create_pull_request`) — use a token with `repo` scope. |
 | `PORT`         | `3000`  | HTTP port                                                                                                                                                                                                     |
 
+### `mcp-azure-cost`
+
+| Variable                | Default | Description                                               |
+| ----------------------- | ------- | --------------------------------------------------------- |
+| `AZURE_SUBSCRIPTION_ID` | —       | Subscription to analyze. Required for any live cost call. |
+| `PORT`                  | `3000`  | HTTP port                                                 |
+
+Auth uses `DefaultAzureCredential` (`az login` locally, managed identity in Azure). The identity needs the **Cost Management Reader** role on the subscription.
+
 ### `chat-ui`
 
 | Variable                       | Description                                                                                                                                                                        |
@@ -338,6 +351,7 @@ Auth uses `DefaultAzureCredential`: `az login` locally, managed identity in Azur
 | `MCP_AZLENS_URL`               | `AzLens-mcp` `/mcp` endpoint                                                                                                                                                       |
 | `MCP_PERSONAL_ASSISTANT_URL`   | `mcp-personal-assistant` `/mcp` endpoint                                                                                                                                           |
 | `MCP_GITHUB_URL`               | `mcp-github` `/mcp` endpoint                                                                                                                                                       |
+| `MCP_AZURE_COST_URL`           | `mcp-azure-cost` `/mcp` endpoint                                                                                                                                                   |
 
 > Tool-approval mode is a per-browser UI setting (the **Approvals** toggle), not an environment variable.
 
@@ -349,7 +363,7 @@ The pipeline deploys **automatically on every push to `main`**, and can also be 
 
 **[▶ Run the deploy workflow](../../actions/workflows/deploy.yml)** _(replace with your repo URL)_
 
-Either trigger provisions the infrastructure, builds & pushes all four container images to ACR, deploys the apps, and prints each endpoint in the run summary.
+Either trigger provisions the infrastructure, builds & pushes all five container images to ACR, deploys the apps, and prints each endpoint in the run summary.
 
 > A portal "Deploy to Azure" button is intentionally not used: these are container images that must be built and pushed to a registry, which the pipeline handles end-to-end.
 
@@ -421,7 +435,7 @@ Push to `main` (or click **Run workflow**). The pipeline:
 1. logs in via OIDC,
 2. creates the resource group,
 3. deploys `infra/main.bicep` (`mcp-infra`) to create ACR + environment + identity,
-4. builds and pushes the four images with `az acr build`,
+4. builds and pushes the five images with `az acr build`,
 5. redeploys (`mcp-apps`) with the real image tags,
 6. prints the `chat-ui`, `mcp-local-coder`, `AzLens-mcp`, and `mcp-personal-assistant` URLs in the run summary.
 
@@ -502,6 +516,7 @@ Beyond tools, each server also exposes MCP **resources** (readable context) and 
 | AzLens-mcp             | `diagnose-resource`, `write-kql` | `azlens://context`                            |
 | mcp-personal-assistant | `plan-my-day`                    | `assistant://todo`, `assistant://notes/today` |
 | mcp-github             | `triage-issue`, `summarize-repo` | `github://rate-limit`                         |
+| mcp-azure-cost         | `cost-review`                    | `azurecost://context`                         |
 
 Clicking a prompt drafts its template into the composer (asking for any arguments); clicking a resource pulls its current content in as context.
 
@@ -593,8 +608,8 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 - **Unit tests** — Vitest in-process tests for `mcp-local-coder` and `mcp-personal-assistant` (`npm test` in each), using the SDK's in-memory transport.
 - **Lint & format** — ESLint (`npm run lint`) for the MCP servers, Prettier (`npm run format`), an `.editorconfig`, and a **Husky pre-commit** hook that runs `lint-staged` (formats staged files).
 - **CI** ([.github/workflows/ci.yml](.github/workflows/ci.yml)) — smoke test, ESLint, per-project **build/typecheck + tests**, and **`bicep build`** on every pull request and push.
-- **Security** — [CodeQL](.github/workflows/codeql.yml) code scanning, [Trivy](.github/workflows/security-scan.yml) image scanning of all four containers, and [Dependabot](.github/dependabot.yml) updates for npm, Docker, and GitHub Actions.
-- **Observability** — set `APPLICATIONINSIGHTS_CONNECTION_STRING` and all four apps export traces, logs, and metrics to **Application Insights** via `@azure/monitor-opentelemetry` (servers: `src/telemetry.ts`; chat-ui: `instrumentation.ts`). The chat route also emits a custom **`chat.turn`** span per reply with the agent, provider, model, routed tier, and token counts. The Bicep provisions a workspace-based Application Insights resource and injects the connection string automatically. Leave it unset to disable.
+- **Security** — [CodeQL](.github/workflows/codeql.yml) code scanning, [Trivy](.github/workflows/security-scan.yml) image scanning of all five containers, and [Dependabot](.github/dependabot.yml) updates for npm, Docker, and GitHub Actions.
+- **Observability** — set `APPLICATIONINSIGHTS_CONNECTION_STRING` and all five apps export traces, logs, and metrics to **Application Insights** via `@azure/monitor-opentelemetry` (servers: `src/telemetry.ts`; chat-ui: `instrumentation.ts`). The chat route also emits a custom **`chat.turn`** span per reply with the agent, provider, model, routed tier, and token counts. The Bicep provisions a workspace-based Application Insights resource and injects the connection string automatically. Leave it unset to disable.
 - **Internal-only MCP option** — deploy with `mcpIngressExternal=false` to keep the MCP servers internal to the Container Apps environment (reachable only by `chat-ui`).
 
 ---

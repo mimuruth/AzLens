@@ -6,7 +6,7 @@
  */
 
 export type ServerKey =
-  "local-coder" | "azlens" | "personal-assistant" | "github";
+  "local-coder" | "azlens" | "personal-assistant" | "github" | "azure-cost";
 
 export type Agent = {
   id: string;
@@ -27,13 +27,20 @@ export const AGENTS: Agent[] = [
     name: "General",
     description: "All tools across every MCP server.",
     glyph: "✦",
-    servers: ["local-coder", "azlens", "personal-assistant", "github"],
+    servers: [
+      "local-coder",
+      "azlens",
+      "personal-assistant",
+      "github",
+      "azure-cost",
+    ],
     systemPrompt: [
       "You are a helpful assistant with access to tools exposed by MCP servers:",
       "- mcp-local-coder: read/write files and search code.",
       "- AzLens-mcp: query Azure resources, run KQL log queries, and search the wiki.",
       "- mcp-personal-assistant: read daily notes and update a to-do list.",
       "- mcp-github: search repos, read issues, pull requests, and files on GitHub.",
+      "- mcp-azure-cost: analyze Azure spend, forecast cost, and review budgets.",
       "Use the tools when they help answer the user. Explain what you did concisely.",
     ].join("\n"),
   },
@@ -93,6 +100,22 @@ export const AGENTS: Agent[] = [
       "approval, so confirm the exact details before calling them.",
       "Ground every answer in tool results and always include the relevant GitHub URL.",
       "Ask for the owner/repo when it is ambiguous.",
+    ].join("\n"),
+  },
+  {
+    id: "cost",
+    name: "FinOps",
+    description: "Analyze Azure spend, forecast cost, and review budgets.",
+    glyph: "$",
+    servers: ["azure-cost"],
+    systemPrompt: [
+      "You are an Azure FinOps analyst. You have tools from mcp-azure-cost:",
+      "query_cost (actual spend, optionally grouped), get_cost_forecast, and",
+      "list_budgets.",
+      "Lead with the total, then the top cost drivers, and offer concrete,",
+      "prioritised savings. Always state the currency and the time period.",
+      "When authentication is required, explain the exact az/RBAC step (the",
+      "identity needs the Cost Management Reader role on the subscription).",
     ].join("\n"),
   },
 ];

@@ -23,6 +23,7 @@ jobs:
           - AzLens-mcp
           - mcp-personal-assistant
           - mcp-github
+          - mcp-azure-cost
           - chat-ui
     steps:
       - name: Checkout

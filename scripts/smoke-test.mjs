@@ -221,6 +221,40 @@ async function testGitHub() {
   }
 }
 
+async function testAzureCost() {
+  console.log("\nmcp-azure-cost (offline checks only)");
+  const client = await connect("mcp-azure-cost", {});
+  try {
+    const names = toolNames(await client.listTools());
+    check(
+      "lists query_cost, get_cost_forecast, list_budgets",
+      ["query_cost", "get_cost_forecast", "list_budgets"].every((n) =>
+        names.includes(n)
+      ),
+      names.join(", ")
+    );
+    const prompts = (await client.listPrompts()).prompts.map((p) => p.name);
+    check(
+      "lists prompt cost-review",
+      prompts.includes("cost-review"),
+      prompts.join(", ")
+    );
+    // query_cost with no Azure creds should return a clear hint, not crash.
+    const res = await client.callTool({
+      name: "query_cost",
+      arguments: { timeframe: "MonthToDate" },
+    });
+    const out = textOf(res);
+    check(
+      "query_cost returns a graceful message without credentials",
+      out.length > 0,
+      out.slice(0, 60)
+    );
+  } finally {
+    await client.close();
+  }
+}
+
 async function main() {
   console.log("Running MCP smoke tests…");
   for (const test of [
@@ -228,6 +262,7 @@ async function main() {
     testPersonalAssistant,
     testAzLens,
     testGitHub,
+    testAzureCost,
   ]) {
     try {
       await test();

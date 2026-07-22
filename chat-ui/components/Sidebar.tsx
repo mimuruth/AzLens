@@ -66,6 +66,20 @@ const SERVER_TOOLS: Record<string, { name: string; example: string }[]> = {
       example: "List open issues in modelcontextprotocol/servers",
     },
   ],
+  "mcp-azure-cost": [
+    {
+      name: "query_cost",
+      example: "Show my Azure cost this month grouped by service",
+    },
+    {
+      name: "get_cost_forecast",
+      example: "Forecast my Azure spend for this month",
+    },
+    {
+      name: "list_budgets",
+      example: "List my Azure budgets and current spend",
+    },
+  ],
 };
 
 export default function Sidebar({

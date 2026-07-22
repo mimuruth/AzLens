@@ -25,6 +25,10 @@ updates:
     directory: "/mcp-github"
     schedule:
       interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/mcp-azure-cost"
+    schedule:
+      interval: "weekly"
   - package-ecosystem: "docker"
     directory: "/chat-ui"
     schedule:
@@ -43,5 +47,9 @@ updates:
       interval: "weekly"
   - package-ecosystem: "docker"
     directory: "/mcp-github"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "docker"
+    directory: "/mcp-azure-cost"
     schedule:
       interval: "weekly"

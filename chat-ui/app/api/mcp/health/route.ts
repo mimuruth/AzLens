@@ -15,6 +15,7 @@ const SERVERS = [
     url: process.env.MCP_PERSONAL_ASSISTANT_URL,
   },
   { name: "mcp-github", url: process.env.MCP_GITHUB_URL },
+  { name: "mcp-azure-cost", url: process.env.MCP_AZURE_COST_URL },
 ];
 
 async function ping(url: string): Promise<boolean> {

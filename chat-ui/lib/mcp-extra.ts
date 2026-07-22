@@ -12,6 +12,7 @@ const SERVER_URLS: Record<ServerKey, string | undefined> = {
   azlens: process.env.MCP_AZLENS_URL,
   "personal-assistant": process.env.MCP_PERSONAL_ASSISTANT_URL,
   github: process.env.MCP_GITHUB_URL,
+  "azure-cost": process.env.MCP_AZURE_COST_URL,
 };
 
 /**

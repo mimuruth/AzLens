@@ -35,6 +35,9 @@ param personalAssistantImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 @description('Container image for mcp-github.')
 param githubImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
+@description('Container image for mcp-azure-cost.')
+param azureCostImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+
 @description('Optional GitHub token for mcp-github (higher rate limit / private repos).')
 @secure()
 param githubToken string = ''
@@ -422,6 +425,41 @@ module github 'container-app.bicep' = {
   ]
 }
 
+module azureCost 'container-app.bicep' = {
+  name: 'mcp-azure-cost'
+  params: {
+    name: 'mcp-azure-cost'
+    location: location
+    environmentId: acaEnvironment.id
+    identityId: identity.id
+    acrLoginServer: acr.properties.loginServer
+    image: azureCostImage
+    targetPort: targetPort
+    externalIngress: mcpIngressExternal
+    envVars: [
+      {
+        name: 'PORT'
+        value: string(targetPort)
+      }
+      {
+        name: 'AZURE_SUBSCRIPTION_ID'
+        value: azLensSubscriptionId
+      }
+      {
+        name: 'AZURE_CLIENT_ID'
+        value: identity.properties.clientId
+      }
+      {
+        name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+        value: appInsights.properties.ConnectionString
+      }
+    ]
+  }
+  dependsOn: [
+    acrPull
+  ]
+}
+
 // ---------------------------------------------------------------------------
 // chat-ui — ChatGPT-style front end (Azure OpenAI + MCP client).
 // Declared inline (not via the shared module) because it needs secrets and,
@@ -504,6 +542,10 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
                 value: '${github.outputs.fqdn}/mcp'
               }
               {
+                name: 'MCP_AZURE_COST_URL'
+                value: '${azureCost.outputs.fqdn}/mcp'
+              }
+              {
                 name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
                 value: appInsights.properties.ConnectionString
               }
@@ -580,4 +622,5 @@ output localCoderUrl string = localCoder.outputs.fqdn
 output azLensUrl string = azLens.outputs.fqdn
 output personalAssistantUrl string = personalAssistant.outputs.fqdn
 output githubUrl string = github.outputs.fqdn
+output azureCostUrl string = azureCost.outputs.fqdn
 output chatUiUrl string = 'https://${chatUi.properties.configuration.ingress.fqdn}'
