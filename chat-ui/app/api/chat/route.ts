@@ -113,8 +113,24 @@ export async function POST(req: Request) {
 
       result.mergeIntoDataStream(dataStream);
     },
-    // Surface the real error text to the browser to make debugging easier.
-    onError: (error) =>
-      error instanceof Error ? error.message : String(error),
+    // Surface the real error text to the browser. For a local (LM Studio /
+    // Ollama) server that's unreachable, return a clear, actionable hint.
+    onError: (error) => {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (
+        chosen.provider === "local" &&
+        /connect|fetch failed|ECONNREFUSED|network|timed out|timeout/i.test(msg)
+      ) {
+        const base =
+          process.env.LOCAL_OPENAI_BASE_URL || "http://localhost:1234/v1";
+        return (
+          `Can't reach the local model server at ${base}. ` +
+          "In LM Studio, open the Developer (Local Server) tab, load a model, " +
+          "and click Start Server — then try again. " +
+          "(You can also pick a different model in the top-right picker.)"
+        );
+      }
+      return msg;
+    },
   });
 }

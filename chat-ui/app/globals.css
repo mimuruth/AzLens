@@ -1148,6 +1148,33 @@ code {
   opacity: 0.85;
 }
 
+/* ---- Chat error banner ---- */
+.chat-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #f59e0b55;
+  background: color-mix(in srgb, #f59e0b 12%, var(--surface));
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.chat-error-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #f59e0b;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+}
+
 /* ---- Rich tool-call cards ---- */
 .tool-card {
   border: 1px solid var(--border);

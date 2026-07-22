@@ -177,6 +177,7 @@ export default function ChatArea({
     reload,
     append,
     addToolResult,
+    error,
   } = useChat({
     id,
     initialMessages: loadMessages(id),
@@ -641,6 +642,26 @@ export default function ChatArea({
                     <i />
                     <i />
                   </span>
+                </div>
+              </div>
+            )}
+            {error && !isBusy && (
+              <div className="msg assistant">
+                <Logo size={28} className="avatar-logo" />
+                <div className="content">
+                  <div className="chat-error">
+                    <span className="chat-error-icon">!</span>
+                    <span>{error.message}</span>
+                  </div>
+                  <div className="msg-actions">
+                    <button
+                      type="button"
+                      className="msg-action"
+                      onClick={() => reload()}
+                    >
+                      Retry
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
