@@ -32,7 +32,7 @@ Each MCP server ships **two transports** from a single codebase:
 
 ## Chat UI
 
-A modern, claude.ai-style front end with a collapsible sidebar, **New chat**, search, and multiple conversations you can switch between (persisted in the browser). Each conversation streams responses from your chosen model and can call the MCP tools.
+A modern, claude.ai-style front end with a collapsible sidebar, **New chat**, search, and multiple conversations you can switch between (persisted in the browser, with optional server-side sync to Azure Cosmos DB). Each conversation streams responses from your chosen model and can call the MCP tools.
 
 Highlights: **multi-provider models** (Azure OpenAI / OpenAI / Anthropic / local LM Studio-style servers) — cloud model lists are **auto-discovered** from each provider's `/models` API (with a curated fallback) — plus an **Auto router** that sends simple prompts to a cheap model and complex ones to a powerful model; a per-turn **usage & cost** footer (prices overridable via `PRICES_JSON`); switchable **agents** (General / Code / Azure / Personal Assistant / GitHub / FinOps), each scoped to the right MCP servers; **tool approval** for mutating tools (including GitHub `create_issue` / `create_pull_request`); **stop / regenerate / copy / edit-and-resend**; **dark mode**; an **MCP tools health panel** (live online/offline dots); chat **rename** + date grouping; markdown rendering; file/image attachments; and a **⌘K command palette**.
 
@@ -334,24 +334,26 @@ Auth uses `DefaultAzureCredential` (`az login` locally, managed identity in Azur
 
 ### `chat-ui`
 
-| Variable                       | Description                                                                                                                                                                        |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CHAT_PROVIDER`                | Optional. Force a provider: `azure` / `openai` / `anthropic` / `local`. Otherwise auto-detected from whichever key is set.                                                         |
-| `AZURE_OPENAI_RESOURCE_NAME`   | Azure OpenAI resource name (not the full URL)                                                                                                                                      |
-| `AZURE_OPENAI_DEPLOYMENT`      | Chat model deployment name, e.g. `gpt-4o`                                                                                                                                          |
-| `AZURE_OPENAI_API_VERSION`     | API version, e.g. `2024-10-21`                                                                                                                                                     |
-| `AZURE_OPENAI_API_KEY`         | API key (a Container Apps secret in Azure)                                                                                                                                         |
-| `OPENAI_API_KEY`               | Optional. Enables the OpenAI provider; its model list is auto-discovered from `/v1/models` (with a curated fallback). `OPENAI_MODEL` overrides the default.                        |
-| `ANTHROPIC_API_KEY`            | Optional. Enables the Anthropic provider; its model list is auto-discovered from `/v1/models` (with a curated fallback). `ANTHROPIC_MODEL` overrides the default.                  |
-| `LOCAL_OPENAI_BASE_URL`        | Optional OpenAI-compatible endpoint (LM Studio / Ollama / vLLM), e.g. `http://localhost:1234/v1`. Enables a **Local** provider whose models are auto-discovered from `/v1/models`. |
-| `LOCAL_MODEL`                  | Optional fallback local model id when `/v1/models` can't be reached; `LOCAL_OPENAI_API_KEY` / `LOCAL_LABEL` are also optional.                                                     |
-| `AUTO_SIMPLE` / `AUTO_COMPLEX` | Optional overrides for the Auto router as `provider:model` (e.g. `anthropic:claude-3-5-sonnet-latest`).                                                                            |
-| `PRICES_JSON`                  | Optional. JSON map of model-id substring → `{ "input": n, "output": n }` (USD per 1M tokens) to override/add cost-estimate prices without code changes.                            |
-| `MCP_LOCAL_CODER_URL`          | `mcp-local-coder` `/mcp` endpoint                                                                                                                                                  |
-| `MCP_AZLENS_URL`               | `AzLens-mcp` `/mcp` endpoint                                                                                                                                                       |
-| `MCP_PERSONAL_ASSISTANT_URL`   | `mcp-personal-assistant` `/mcp` endpoint                                                                                                                                           |
-| `MCP_GITHUB_URL`               | `mcp-github` `/mcp` endpoint                                                                                                                                                       |
-| `MCP_AZURE_COST_URL`           | `mcp-azure-cost` `/mcp` endpoint                                                                                                                                                   |
+| Variable                               | Description                                                                                                                                                                        |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CHAT_PROVIDER`                        | Optional. Force a provider: `azure` / `openai` / `anthropic` / `local`. Otherwise auto-detected from whichever key is set.                                                         |
+| `AZURE_OPENAI_RESOURCE_NAME`           | Azure OpenAI resource name (not the full URL)                                                                                                                                      |
+| `AZURE_OPENAI_DEPLOYMENT`              | Chat model deployment name, e.g. `gpt-4o`                                                                                                                                          |
+| `AZURE_OPENAI_API_VERSION`             | API version, e.g. `2024-10-21`                                                                                                                                                     |
+| `AZURE_OPENAI_API_KEY`                 | API key (a Container Apps secret in Azure)                                                                                                                                         |
+| `OPENAI_API_KEY`                       | Optional. Enables the OpenAI provider; its model list is auto-discovered from `/v1/models` (with a curated fallback). `OPENAI_MODEL` overrides the default.                        |
+| `ANTHROPIC_API_KEY`                    | Optional. Enables the Anthropic provider; its model list is auto-discovered from `/v1/models` (with a curated fallback). `ANTHROPIC_MODEL` overrides the default.                  |
+| `LOCAL_OPENAI_BASE_URL`                | Optional OpenAI-compatible endpoint (LM Studio / Ollama / vLLM), e.g. `http://localhost:1234/v1`. Enables a **Local** provider whose models are auto-discovered from `/v1/models`. |
+| `LOCAL_MODEL`                          | Optional fallback local model id when `/v1/models` can't be reached; `LOCAL_OPENAI_API_KEY` / `LOCAL_LABEL` are also optional.                                                     |
+| `AUTO_SIMPLE` / `AUTO_COMPLEX`         | Optional overrides for the Auto router as `provider:model` (e.g. `anthropic:claude-3-5-sonnet-latest`).                                                                            |
+| `PRICES_JSON`                          | Optional. JSON map of model-id substring → `{ "input": n, "output": n }` (USD per 1M tokens) to override/add cost-estimate prices without code changes.                            |
+| `MCP_LOCAL_CODER_URL`                  | `mcp-local-coder` `/mcp` endpoint                                                                                                                                                  |
+| `MCP_AZLENS_URL`                       | `AzLens-mcp` `/mcp` endpoint                                                                                                                                                       |
+| `MCP_PERSONAL_ASSISTANT_URL`           | `mcp-personal-assistant` `/mcp` endpoint                                                                                                                                           |
+| `MCP_GITHUB_URL`                       | `mcp-github` `/mcp` endpoint                                                                                                                                                       |
+| `MCP_AZURE_COST_URL`                   | `mcp-azure-cost` `/mcp` endpoint                                                                                                                                                   |
+| `COSMOS_ENDPOINT`                      | Optional. Azure Cosmos DB account endpoint (AAD/managed-identity auth) to persist conversations server-side. `COSMOS_CONNECTION_STRING` is an alternative for local dev.           |
+| `COSMOS_DATABASE` / `COSMOS_CONTAINER` | Optional. Cosmos database/container names (default `azlens` / `conversations`).                                                                                                    |
 
 > Tool-approval mode is a per-browser UI setting (the **Approvals** toggle), not an environment variable.
 
@@ -460,6 +462,13 @@ az deployment group create -g rg-mcp -f infra/main.bicep \
   -p infra/main.parameters.json -p useKeyVault=true
 ```
 
+**Conversation persistence (optional)** — deploy with `deployCosmos=true` to provision an **Azure Cosmos DB** account (AAD-only; local auth disabled) and persist chat history server-side. The template creates the `azlens`/`conversations` database + container, grants the managed identity the **Cosmos DB Built-in Data Contributor** data-plane role, and injects `COSMOS_ENDPOINT` into chat-ui. Conversations are mirrored from the browser (write-through) and hydrated on a fresh device; when `deployCosmos` is off, chat-ui uses `localStorage` only.
+
+```bash
+az deployment group create -g rg-mcp -f infra/main.bicep \
+  -p infra/main.parameters.json -p deployCosmos=true
+```
+
 ---
 
 ## Manual deploy (without GitHub Actions)
@@ -528,7 +537,7 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 
 **Conversations**
 
-- Multiple chats, persisted in the browser (localStorage) and switchable from the sidebar. Each chat remembers **its own agent and model** selection.
+- Multiple chats, persisted in the browser (localStorage) and switchable from the sidebar, with **optional Azure Cosmos DB** sync (write-through + fresh-device hydration) when `COSMOS_ENDPOINT` is set. Each chat remembers **its own agent and model** selection.
 - Auto-generated titles from the first message; **double-click a chat to rename** it.
 - **Pin** chats to a dedicated section; the rest are grouped by **Today / Yesterday / Previous 7 days / Older**.
 - Delete individual chats or **Clear all chats**.

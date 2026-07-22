@@ -14,6 +14,7 @@ import {
   saveConversations,
   loadActive,
   saveActive,
+  loadMessages,
   saveMessages,
   deleteMessages,
   titleFromMessages,
@@ -28,6 +29,7 @@ import {
   newId,
 } from "@/lib/storage";
 import { DEFAULT_AGENT_ID } from "@/lib/agents";
+import { cloudInit, cloudMessages, cloudSave, cloudDelete } from "@/lib/cloud";
 import {
   downloadFile,
   exportChatMarkdown,
@@ -57,24 +59,47 @@ export default function Page() {
 
   // Load persisted state on mount (client only, avoids hydration mismatch).
   useEffect(() => {
-    let list = loadConversations();
-    let active = loadActive() ?? "";
-    if (list.length === 0) {
-      const id = newId();
-      list = [{ id, title: "New chat", updatedAt: Date.now() }];
-      active = id;
-      saveConversations(list);
-      saveActive(id);
-    }
-    if (!list.some((c) => c.id === active)) active = list[0].id;
     const t = loadTheme();
     document.documentElement.setAttribute("data-theme", t);
     setTheme(t);
     setAgentId(loadAgentId() ?? DEFAULT_AGENT_ID);
     setRequireApproval(loadApproval());
-    setConversations(list);
-    setActiveId(active);
-    setReady(true);
+
+    void (async () => {
+      let list = loadConversations();
+      let active = loadActive() ?? "";
+      const wasEmpty = list.length === 0;
+
+      // On a fresh device, hydrate conversations from the cloud when the
+      // server has Cosmos-backed history enabled. Local data always wins if it
+      // already exists (avoids clobbering unsynced work).
+      try {
+        const cloud = await cloudInit();
+        if (cloud.enabled && wasEmpty && cloud.conversations.length > 0) {
+          list = cloud.conversations;
+          for (const c of list) {
+            saveMessages(c.id, await cloudMessages(c.id));
+          }
+          saveConversations(list);
+          active = list[0].id;
+          saveActive(active);
+        }
+      } catch {
+        /* offline or disabled — fall back to local storage */
+      }
+
+      if (list.length === 0) {
+        const id = newId();
+        list = [{ id, title: "New chat", updatedAt: Date.now() }];
+        active = id;
+        saveConversations(list);
+        saveActive(id);
+      }
+      if (!list.some((c) => c.id === active)) active = list[0].id;
+      setConversations(list);
+      setActiveId(active);
+      setReady(true);
+    })();
   }, []);
 
   // Global Cmd/Ctrl+K to toggle the command palette.
@@ -154,6 +179,8 @@ export default function Page() {
         c.id === id ? { ...c, title, renamed: true } : c
       );
       saveConversations(list);
+      const updated = list.find((c) => c.id === id);
+      if (updated) cloudSave(updated, loadMessages(id));
       return list;
     });
   }, []);
@@ -170,6 +197,7 @@ export default function Page() {
   const deleteChat = useCallback(
     (id: string) => {
       deleteMessages(id);
+      cloudDelete(id);
       setConversations((prev) => {
         let list = prev.filter((c) => c.id !== id);
         if (list.length === 0) {
@@ -190,7 +218,10 @@ export default function Page() {
 
   const clearAll = useCallback(() => {
     setConversations((prev) => {
-      prev.forEach((c) => deleteMessages(c.id));
+      prev.forEach((c) => {
+        deleteMessages(c.id);
+        cloudDelete(c.id);
+      });
       const nid = newId();
       const list = [{ id: nid, title: "New chat", updatedAt: Date.now() }];
       saveConversations(list);
@@ -206,6 +237,8 @@ export default function Page() {
         c.id === id ? { ...c, pinned: !c.pinned } : c
       );
       saveConversations(list);
+      const updated = list.find((c) => c.id === id);
+      if (updated) cloudSave(updated, loadMessages(id));
       return list;
     });
   }, []);
@@ -219,6 +252,8 @@ export default function Page() {
           c.id === activeId ? { ...c, model: sel } : c
         );
         saveConversations(list);
+        const updated = list.find((c) => c.id === activeId);
+        if (updated) cloudSave(updated, loadMessages(activeId));
         return list;
       });
     },
@@ -234,6 +269,8 @@ export default function Page() {
           c.id === activeId ? { ...c, agentId: id } : c
         );
         saveConversations(list);
+        const updated = list.find((c) => c.id === activeId);
+        if (updated) cloudSave(updated, loadMessages(activeId));
         return list;
       });
     },
@@ -301,14 +338,21 @@ export default function Page() {
       const idx = prev.findIndex((c) => c.id === id);
       if (idx < 0) return prev;
       const current = prev[idx];
-      if (current.renamed) return prev;
+      if (current.renamed) {
+        cloudSave(current, messages);
+        return prev;
+      }
       const nextTitle = titleFromMessages(messages);
       // Only touch state when the derived title actually changes (once, when
       // the first user message arrives) — never on every streamed token.
-      if (!nextTitle || nextTitle === current.title) return prev;
+      if (!nextTitle || nextTitle === current.title) {
+        cloudSave(current, messages);
+        return prev;
+      }
       const list = [...prev];
       list[idx] = { ...current, title: nextTitle, updatedAt: Date.now() };
       saveConversations(list);
+      cloudSave(list[idx], messages);
       return list;
     });
   }, []);

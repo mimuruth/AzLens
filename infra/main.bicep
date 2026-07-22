@@ -79,6 +79,9 @@ param entraClientSecret string = ''
 @description('Store secrets in Key Vault and reference them from the container apps (recommended). When false, secrets are set inline as Container Apps secrets.')
 param useKeyVault bool = false
 
+@description('Deploy an Azure Cosmos DB account and persist chat-ui conversations there (AAD/managed-identity auth). When false, conversations stay in the browser only.')
+param deployCosmos bool = false
+
 var uniqueSuffix = uniqueString(resourceGroup().id)
 var acrName = toLower('${namePrefix}acr${uniqueSuffix}')
 var logAnalyticsName = '${namePrefix}-logs-${uniqueSuffix}'
@@ -86,6 +89,10 @@ var environmentName = '${namePrefix}-env-${uniqueSuffix}'
 var identityName = '${namePrefix}-id-${uniqueSuffix}'
 var keyVaultName = toLower('${namePrefix}kv${take(uniqueSuffix, 8)}')
 var keyVaultUri = 'https://${keyVaultName}${environment().suffixes.keyvaultDns}/'
+var cosmosAccountName = toLower('${namePrefix}cosmos${take(uniqueSuffix, 8)}')
+var cosmosDatabaseName = 'azlens'
+var cosmosContainerName = 'conversations'
+var cosmosEndpoint = 'https://${cosmosAccountName}.documents.azure.com:443/'
 var targetPort = 3000
 var enableAuth = !empty(entraClientId)
 
@@ -287,6 +294,88 @@ resource acaEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Cosmos DB (optional) — persists chat-ui conversations. AAD-only (local auth
+// disabled); the shared managed identity gets the built-in Data Contributor
+// data-plane role.
+// ---------------------------------------------------------------------------
+resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = if (deployCosmos) {
+  name: cosmosAccountName
+  location: location
+  kind: 'GlobalDocumentDB'
+  properties: {
+    databaseAccountOfferType: 'Standard'
+    disableLocalAuth: true
+    consistencyPolicy: {
+      defaultConsistencyLevel: 'Session'
+    }
+    locations: [
+      {
+        locationName: location
+        failoverPriority: 0
+      }
+    ]
+  }
+}
+
+resource cosmosDb 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-05-15' = if (deployCosmos) {
+  parent: cosmos
+  name: cosmosDatabaseName
+  properties: {
+    resource: {
+      id: cosmosDatabaseName
+    }
+  }
+}
+
+resource cosmosContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15' = if (deployCosmos) {
+  parent: cosmosDb
+  name: cosmosContainerName
+  properties: {
+    resource: {
+      id: cosmosContainerName
+      partitionKey: {
+        paths: [
+          '/userId'
+        ]
+        kind: 'Hash'
+      }
+    }
+  }
+}
+
+// Cosmos DB Built-in Data Contributor (data-plane) role for the identity.
+resource cosmosDataRole 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-05-15' = if (deployCosmos) {
+  parent: cosmos
+  name: guid(cosmosAccountName, identity.id, 'data-contributor')
+  properties: {
+    roleDefinitionId: resourceId(
+      'Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions',
+      cosmosAccountName,
+      '00000000-0000-0000-0000-000000000002'
+    )
+    principalId: identity.properties.principalId
+    scope: cosmos.id
+  }
+}
+
+var cosmosEnv = deployCosmos
+  ? [
+      {
+        name: 'COSMOS_ENDPOINT'
+        value: cosmosEndpoint
+      }
+      {
+        name: 'COSMOS_DATABASE'
+        value: cosmosDatabaseName
+      }
+      {
+        name: 'COSMOS_CONTAINER'
+        value: cosmosContainerName
+      }
+    ]
+  : []
 
 // ---------------------------------------------------------------------------
 // The three MCP container apps.
@@ -550,7 +639,7 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
                 value: appInsights.properties.ConnectionString
               }
             ],
-            openAiKeyEnv
+            concat(openAiKeyEnv, cosmosEnv)
           )
           probes: [
             {
@@ -576,6 +665,8 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
     kvSecretsUser
     kvOpenAiSecret
     kvAadSecret
+    cosmosDataRole
+    cosmosContainer
   ]
 }
 
@@ -623,4 +714,5 @@ output azLensUrl string = azLens.outputs.fqdn
 output personalAssistantUrl string = personalAssistant.outputs.fqdn
 output githubUrl string = github.outputs.fqdn
 output azureCostUrl string = azureCost.outputs.fqdn
+output cosmosAccountName string = deployCosmos ? cosmosAccountName : ''
 output chatUiUrl string = 'https://${chatUi.properties.configuration.ingress.fqdn}'

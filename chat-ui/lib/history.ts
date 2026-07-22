@@ -1,0 +1,100 @@
+import "server-only";
+import type { UIMessage } from "ai";
+import { cosmosConfigured, getContainer } from "./cosmos";
+
+/**
+ * Server-side conversation history backed by Cosmos DB. One document per
+ * conversation, partitioned by userId. Metadata mirrors the client's
+ * Conversation type; the full message list is stored alongside it.
+ */
+export type StoredConversation = {
+  id: string;
+  userId: string;
+  title: string;
+  updatedAt: number;
+  renamed?: boolean;
+  pinned?: boolean;
+  agentId?: string;
+  model?: { provider: string; model: string };
+  messages?: UIMessage[];
+};
+
+export type ConversationMeta = Omit<StoredConversation, "userId" | "messages">;
+
+export function historyEnabled(): boolean {
+  return cosmosConfigured();
+}
+
+/**
+ * Resolve the current user from Easy Auth headers (injected by Azure Container
+ * Apps when Entra sign-in is on). Falls back to a shared "local" partition for
+ * unauthenticated / local development.
+ */
+export function userIdFromHeaders(headers: Headers): string {
+  return (
+    headers.get("x-ms-client-principal-id") ||
+    headers.get("x-ms-client-principal-name") ||
+    "local"
+  );
+}
+
+export async function listConversations(
+  userId: string
+): Promise<ConversationMeta[]> {
+  const container = await getContainer();
+  if (!container) return [];
+  const { resources } = await container.items
+    .query<ConversationMeta>({
+      query:
+        "SELECT c.id, c.title, c.updatedAt, c.renamed, c.pinned, c.agentId, c.model " +
+        "FROM c WHERE c.userId = @u ORDER BY c.updatedAt DESC",
+      parameters: [{ name: "@u", value: userId }],
+    })
+    .fetchAll();
+  return resources;
+}
+
+export async function getConversation(
+  userId: string,
+  id: string
+): Promise<StoredConversation | null> {
+  const container = await getContainer();
+  if (!container) return null;
+  try {
+    const { resource } = await container
+      .item(id, userId)
+      .read<StoredConversation>();
+    return resource ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function upsertConversation(
+  userId: string,
+  conversation: Omit<StoredConversation, "userId" | "messages">,
+  messages: UIMessage[]
+): Promise<void> {
+  const container = await getContainer();
+  if (!container) return;
+  const doc: StoredConversation = {
+    ...conversation,
+    userId,
+    messages: messages ?? [],
+    updatedAt: conversation.updatedAt ?? Date.now(),
+  };
+  await container.items.upsert(doc);
+}
+
+export async function deleteConversation(
+  userId: string,
+  id: string
+): Promise<void> {
+  const container = await getContainer();
+  if (!container) return;
+  try {
+    await container.item(id, userId).delete();
+  } catch {
+    /* already gone */
+  }
+}
