@@ -184,7 +184,14 @@ Point your client at [claude_desktop_config.json](claude_desktop_config.json) (r
 
 ### 3. Run the chat UI locally
 
-Run each server on its own HTTP port, then start the UI:
+**Fastest — one command** (builds each server if needed, then starts all six MCP servers on :3001–:3006 and the UI on :3000 with prefixed output; Ctrl+C stops everything):
+
+```bash
+cd chat-ui && cp .env.example .env.local   # once — fill in a model key
+cd .. && npm run dev:all
+```
+
+Or start each process in its own terminal for finer control:
 
 ```bash
 # terminal 1

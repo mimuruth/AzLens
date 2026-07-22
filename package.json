@@ -5,6 +5,7 @@
   "type": "module",
   "description": "MCP multi-server workspace — root dev tooling (smoke tests, lint, format)",
   "scripts": {
+    "dev:all": "node scripts/dev-all.mjs",
     "smoke": "node scripts/smoke-test.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
