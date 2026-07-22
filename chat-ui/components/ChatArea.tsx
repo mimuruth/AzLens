@@ -10,6 +10,7 @@ import {
   loadMessages,
   type ModelProvider,
   type ModelSelection,
+  type PromptTemplate,
 } from "@/lib/storage";
 import { AGENTS } from "@/lib/agents";
 import { isSensitiveTool } from "@/lib/tools";
@@ -181,6 +182,9 @@ export default function ChatArea({
   onToggleApproval,
   instructions,
   onSetInstructions,
+  templates,
+  onSaveTemplate,
+  onBookmark,
   prefill,
   onMessages,
   onToggleSidebar,
@@ -195,6 +199,9 @@ export default function ChatArea({
   onToggleApproval: () => void;
   instructions: string;
   onSetInstructions: (text: string) => void;
+  templates: PromptTemplate[];
+  onSaveTemplate: (title: string, text: string) => void;
+  onBookmark: (message: UIMessage) => void;
   prefill: { text: string; nonce: number } | null;
   onMessages: (id: string, messages: UIMessage[]) => void;
   onToggleSidebar: () => void;
@@ -251,6 +258,7 @@ export default function ChatArea({
   const [editText, setEditText] = useState("");
   const [instrOpen, setInstrOpen] = useState(false);
   const [instrDraft, setInstrDraft] = useState(instructions);
+  const [tplOpen, setTplOpen] = useState(false);
 
   const canSend = input.trim().length > 0 || attachments.length > 0;
 
@@ -707,6 +715,14 @@ export default function ChatArea({
                         return null;
                       })}
                       <div className="msg-actions">
+                        <button
+                          type="button"
+                          className="msg-action"
+                          onClick={() => onBookmark(message)}
+                          title="Bookmark this message"
+                        >
+                          Bookmark
+                        </button>
                         {message.role === "assistant" && (
                           <button
                             type="button"
@@ -812,6 +828,77 @@ export default function ChatArea({
           )}
 
           <div className="composer-row">
+            <button
+              type="button"
+              className="attach"
+              aria-label="Saved prompts"
+              title="Saved prompts"
+              onClick={() => setTplOpen((o) => !o)}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M6 4h9l3 3v13a1 1 0 01-1 1H6a1 1 0 01-1-1V5a1 1 0 011-1z"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M9 12h6M9 16h6"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+            {tplOpen && (
+              <div className="tpl-menu" onMouseLeave={() => setTplOpen(false)}>
+                <div className="tpl-menu-head">
+                  <span>Saved prompts</span>
+                  <button
+                    type="button"
+                    className="tpl-save"
+                    disabled={input.trim().length === 0}
+                    onClick={() => {
+                      const title = window.prompt(
+                        "Name this prompt:",
+                        input.trim().slice(0, 40)
+                      );
+                      if (title !== null) {
+                        onSaveTemplate(title, input);
+                        setTplOpen(false);
+                      }
+                    }}
+                  >
+                    Save current draft
+                  </button>
+                </div>
+                {templates.length === 0 ? (
+                  <div className="tpl-empty">
+                    No saved prompts yet. Type a message, then “Save current
+                    draft”.
+                  </div>
+                ) : (
+                  <ul className="tpl-list">
+                    {templates.map((t) => (
+                      <li key={t.id}>
+                        <button
+                          type="button"
+                          className="tpl-item"
+                          title={t.text}
+                          onClick={() => {
+                            setInput(t.text);
+                            setTplOpen(false);
+                            textareaRef.current?.focus();
+                          }}
+                        >
+                          {t.title}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
             <button
               type="button"
               className="attach"

@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Conversation } from "@/lib/storage";
+import { type Conversation, searchAllMessages } from "@/lib/storage";
 
 type Item =
   | { type: "action"; id: string; label: string }
-  | { type: "chat"; id: string; label: string };
+  | { type: "chat"; id: string; label: string }
+  | { type: "message"; id: string; label: string; snippet: string };
 
 export default function CommandPalette({
   conversations,
@@ -50,7 +51,16 @@ export default function CommandPalette({
     .slice(0, 8)
     .map((c) => ({ type: "chat", id: c.id, label: c.title }));
 
-  const items = [...actions, ...chats];
+  const messageHits: Item[] = searchAllMessages(conversations, query, 8).map(
+    (h) => ({
+      type: "message",
+      id: h.convoId,
+      label: h.title,
+      snippet: h.snippet,
+    })
+  );
+
+  const items = [...actions, ...chats, ...messageHits];
   const clampedActive = Math.min(active, Math.max(items.length - 1, 0));
 
   function run(item: Item) {
@@ -99,7 +109,9 @@ export default function CommandPalette({
           placeholder="Search chats or run a command…"
         />
         <div className="palette-list">
-          {items.length === 0 && <div className="palette-empty">No results</div>}
+          {items.length === 0 && (
+            <div className="palette-empty">No results</div>
+          )}
           {actions.length > 0 && <div className="palette-label">Actions</div>}
           {actions.map((item) => {
             const i = items.indexOf(item);
@@ -125,6 +137,25 @@ export default function CommandPalette({
                 onClick={() => run(item)}
               >
                 {item.label}
+              </button>
+            );
+          })}
+          {messageHits.length > 0 && (
+            <div className="palette-label">Messages</div>
+          )}
+          {messageHits.map((item, idx) => {
+            const i = items.indexOf(item);
+            return (
+              <button
+                key={`m-${item.id}-${idx}`}
+                className={`palette-item ${i === clampedActive ? "active" : ""}`}
+                onMouseEnter={() => setActive(i)}
+                onClick={() => run(item)}
+              >
+                <span className="palette-item-title">{item.label}</span>
+                {item.type === "message" && (
+                  <span className="palette-item-snippet">{item.snippet}</span>
+                )}
               </button>
             );
           })}

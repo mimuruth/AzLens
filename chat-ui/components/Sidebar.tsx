@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { type Conversation, type Theme, groupByDate } from "@/lib/storage";
+import {
+  type Conversation,
+  type Theme,
+  type Bookmark,
+  type PromptTemplate,
+  groupByDate,
+} from "@/lib/storage";
 import Logo from "@/components/Logo";
 
 type ServerHealth = { name: string; ok: boolean; configured: boolean };
@@ -97,6 +103,12 @@ export default function Sidebar({
   onUseTool,
   onClearAll,
   onToggleTheme,
+  bookmarks,
+  templates,
+  onSelectBookmark,
+  onRemoveBookmark,
+  onInsertTemplate,
+  onRemoveTemplate,
 }: {
   conversations: Conversation[];
   activeId: string;
@@ -112,6 +124,12 @@ export default function Sidebar({
   onUseTool: (prompt: string) => void;
   onClearAll: () => void;
   onToggleTheme: () => void;
+  bookmarks: Bookmark[];
+  templates: PromptTemplate[];
+  onSelectBookmark: (convoId: string) => void;
+  onRemoveBookmark: (id: string) => void;
+  onInsertTemplate: (text: string) => void;
+  onRemoveTemplate: (id: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -120,6 +138,7 @@ export default function Sidebar({
   const [expandedServer, setExpandedServer] = useState<string | null>(null);
   const [servers, setServers] = useState<ServerHealth[]>([]);
   const [libOpen, setLibOpen] = useState(false);
+  const [savedOpen, setSavedOpen] = useState(false);
   const [library, setLibrary] = useState<{
     prompts: LibraryPrompt[];
     resources: LibraryResource[];
@@ -621,6 +640,79 @@ export default function Sidebar({
                     <span className="lib-glyph">@</span>
                     <span className="lib-text">{r.title ?? r.name}</span>
                   </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {bookmarks.length + templates.length > 0 && (
+          <div className="tools-panel">
+            <button
+              className="tools-head"
+              onClick={() => setSavedOpen((v) => !v)}
+              aria-expanded={savedOpen}
+            >
+              <span>Saved ({bookmarks.length + templates.length})</span>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                className={savedOpen ? "chev open" : "chev"}
+              >
+                <path
+                  d="M6 9l6 6 6-6"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            {savedOpen && (
+              <div className="tools-list">
+                {templates.length > 0 && <p className="lib-label">Prompts</p>}
+                {templates.map((t) => (
+                  <div key={t.id} className="saved-row">
+                    <button
+                      className="lib-item saved-main"
+                      onClick={() => onInsertTemplate(t.text)}
+                      title={t.text}
+                    >
+                      <span className="lib-glyph">/</span>
+                      <span className="lib-text">{t.title}</span>
+                    </button>
+                    <button
+                      className="saved-remove"
+                      aria-label="Delete prompt"
+                      onClick={() => onRemoveTemplate(t.id)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                {bookmarks.length > 0 && <p className="lib-label">Bookmarks</p>}
+                {bookmarks.map((b) => (
+                  <div key={b.id} className="saved-row">
+                    <button
+                      className="lib-item saved-main"
+                      onClick={() => onSelectBookmark(b.convoId)}
+                      title={b.text}
+                    >
+                      <span className="lib-glyph">★</span>
+                      <span className="lib-text">
+                        {b.text.replace(/\s+/g, " ").slice(0, 48)}
+                      </span>
+                    </button>
+                    <button
+                      className="saved-remove"
+                      aria-label="Delete bookmark"
+                      onClick={() => onRemoveBookmark(b.id)}
+                    >
+                      ×
+                    </button>
+                  </div>
                 ))}
               </div>
             )}

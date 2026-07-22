@@ -164,3 +164,93 @@ export function titleFromMessages(messages: UIMessage[]): string | null {
   if (!text) return null;
   return text.length > 42 ? `${text.slice(0, 42)}…` : text;
 }
+
+/** Plain text of a message across both the `parts` and legacy `content` shapes. */
+export function messageText(message: UIMessage): string {
+  const fromParts = (message.parts ?? [])
+    .filter((p) => p.type === "text")
+    .map((p) => (p as { text: string }).text)
+    .join("\n")
+    .trim();
+  return fromParts || (message as { content?: string }).content || "";
+}
+
+// ---- Bookmarks (saved messages) --------------------------------------------
+
+export type Bookmark = {
+  id: string;
+  convoId: string;
+  role: string;
+  text: string;
+  createdAt: number;
+};
+
+const BOOKMARKS_KEY = "azlens.bookmarks";
+
+export function loadBookmarks(): Bookmark[] {
+  if (!hasWindow()) return [];
+  try {
+    return JSON.parse(localStorage.getItem(BOOKMARKS_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+export function saveBookmarks(list: Bookmark[]): void {
+  if (hasWindow()) localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(list));
+}
+
+// ---- Prompt templates (reusable snippets) ----------------------------------
+
+export type PromptTemplate = { id: string; title: string; text: string };
+
+const TEMPLATES_KEY = "azlens.templates";
+
+export function loadTemplates(): PromptTemplate[] {
+  if (!hasWindow()) return [];
+  try {
+    return JSON.parse(localStorage.getItem(TEMPLATES_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+export function saveTemplates(list: PromptTemplate[]): void {
+  if (hasWindow()) localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list));
+}
+
+// ---- Cross-conversation message search -------------------------------------
+
+export type MessageHit = { convoId: string; title: string; snippet: string };
+
+/** Search message bodies across all conversations (localStorage-backed). */
+export function searchAllMessages(
+  conversations: Conversation[],
+  query: string,
+  limit = 8
+): MessageHit[] {
+  const q = query.trim().toLowerCase();
+  if (q.length < 2) return [];
+  const hits: MessageHit[] = [];
+  for (const convo of conversations) {
+    const messages = loadMessages(convo.id);
+    for (const m of messages) {
+      const text = messageText(m);
+      const at = text.toLowerCase().indexOf(q);
+      if (at >= 0) {
+        const start = Math.max(0, at - 30);
+        const snippet =
+          (start > 0 ? "…" : "") +
+          text
+            .slice(start, at + q.length + 40)
+            .replace(/\s+/g, " ")
+            .trim() +
+          "…";
+        hits.push({ convoId: convo.id, title: convo.title, snippet });
+        break; // one hit per conversation keeps the list scannable
+      }
+    }
+    if (hits.length >= limit) break;
+  }
+  return hits;
+}

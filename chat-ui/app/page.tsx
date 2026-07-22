@@ -10,6 +10,8 @@ import {
   type Theme,
   type ModelSelection,
   type ModelProvider,
+  type Bookmark,
+  type PromptTemplate,
   loadConversations,
   saveConversations,
   loadActive,
@@ -18,6 +20,7 @@ import {
   saveMessages,
   deleteMessages,
   titleFromMessages,
+  messageText,
   loadTheme,
   saveTheme,
   loadModel,
@@ -26,6 +29,10 @@ import {
   saveAgentId,
   loadApproval,
   saveApproval,
+  loadBookmarks,
+  saveBookmarks,
+  loadTemplates,
+  saveTemplates,
   newId,
 } from "@/lib/storage";
 import { DEFAULT_AGENT_ID } from "@/lib/agents";
@@ -47,6 +54,8 @@ export default function Page() {
   const [modelSel, setModelSel] = useState<ModelSelection | null>(null);
   const [agentId, setAgentId] = useState<string>(DEFAULT_AGENT_ID);
   const [requireApproval, setRequireApproval] = useState(true);
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [templates, setTemplates] = useState<PromptTemplate[]>([]);
   const [prefill, setPrefill] = useState<{
     text: string;
     nonce: number;
@@ -64,6 +73,8 @@ export default function Page() {
     setTheme(t);
     setAgentId(loadAgentId() ?? DEFAULT_AGENT_ID);
     setRequireApproval(loadApproval());
+    setBookmarks(loadBookmarks());
+    setTemplates(loadTemplates());
 
     void (async () => {
       let list = loadConversations();
@@ -346,6 +357,57 @@ export default function Page() {
     [activeId]
   );
 
+  const addBookmark = useCallback(
+    (message: UIMessage) => {
+      const text = messageText(message);
+      if (!text.trim()) return;
+      setBookmarks((prev) => {
+        const bm: Bookmark = {
+          id: newId(),
+          convoId: activeId,
+          role: message.role,
+          text,
+          createdAt: Date.now(),
+        };
+        const list = [bm, ...prev].slice(0, 200);
+        saveBookmarks(list);
+        return list;
+      });
+    },
+    [activeId]
+  );
+
+  const removeBookmark = useCallback((id: string) => {
+    setBookmarks((prev) => {
+      const list = prev.filter((b) => b.id !== id);
+      saveBookmarks(list);
+      return list;
+    });
+  }, []);
+
+  const saveTemplate = useCallback((title: string, text: string) => {
+    const t = text.trim();
+    if (!t) return;
+    setTemplates((prev) => {
+      const tpl: PromptTemplate = {
+        id: newId(),
+        title: (title.trim() || t.slice(0, 32)).slice(0, 60),
+        text: t,
+      };
+      const list = [tpl, ...prev].slice(0, 100);
+      saveTemplates(list);
+      return list;
+    });
+  }, []);
+
+  const removeTemplate = useCallback((id: string) => {
+    setTemplates((prev) => {
+      const list = prev.filter((t) => t.id !== id);
+      saveTemplates(list);
+      return list;
+    });
+  }, []);
+
   // Persist messages and keep the conversation title/order in sync.
   const handleMessages = useCallback((id: string, messages: UIMessage[]) => {
     saveMessages(id, messages);
@@ -394,6 +456,12 @@ export default function Page() {
         onUseTool={useTool}
         onClearAll={clearAll}
         onToggleTheme={toggleTheme}
+        bookmarks={bookmarks}
+        templates={templates}
+        onSelectBookmark={selectChat}
+        onRemoveBookmark={removeBookmark}
+        onInsertTemplate={useTool}
+        onRemoveTemplate={removeTemplate}
       />
       <ChatArea
         key={activeId}
@@ -407,6 +475,9 @@ export default function Page() {
         onToggleApproval={toggleApproval}
         instructions={activeInstructions}
         onSetInstructions={changeInstructions}
+        templates={templates}
+        onSaveTemplate={saveTemplate}
+        onBookmark={addBookmark}
         prefill={prefill}
         onMessages={handleMessages}
         onToggleSidebar={() => setCollapsed((v) => !v)}
