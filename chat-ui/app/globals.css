@@ -1148,6 +1148,143 @@ code {
   opacity: 0.85;
 }
 
+/* ---- Rich tool-call cards ---- */
+.tool-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  margin: 8px 0;
+  overflow: hidden;
+}
+
+.tool-card.awaiting {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+.tool-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 11px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.tool-card-head code {
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+
+.tc-verb {
+  color: var(--text-muted);
+}
+
+.tool-dot.live {
+  animation: pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.tool-card-head .chev {
+  margin-left: auto;
+  transition: transform 0.15s ease;
+}
+
+.tool-card-head .chev.open {
+  transform: rotate(180deg);
+}
+
+.tool-card-body {
+  padding: 0 11px 10px;
+}
+
+.tc-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  margin: 8px 0 4px;
+}
+
+.tc-pre {
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--code-bg);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 260px;
+  overflow: auto;
+}
+
+/* ---- MCP library (prompts + resources) ---- */
+.lib-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  margin: 8px 6px 2px;
+}
+
+.lib-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  text-align: left;
+}
+
+.lib-item:hover {
+  background: var(--hover);
+}
+
+.lib-glyph {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.lib-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---- Approval toggle (topbar) ---- */
 .approval-toggle {
   display: inline-flex;

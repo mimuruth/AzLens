@@ -6,6 +6,23 @@ import Logo from "@/components/Logo";
 
 type ServerHealth = { name: string; ok: boolean; configured: boolean };
 
+type LibraryPrompt = {
+  server: string;
+  name: string;
+  title?: string;
+  description?: string;
+  arguments?: { name: string; description?: string; required?: boolean }[];
+};
+
+type LibraryResource = {
+  server: string;
+  name: string;
+  uri: string;
+  title?: string;
+  description?: string;
+  mimeType?: string;
+};
+
 /** Example prompts per server tool, used when a tool is clicked. */
 const SERVER_TOOLS: Record<string, { name: string; example: string }[]> = {
   "mcp-local-coder": [
@@ -74,6 +91,11 @@ export default function Sidebar({
   const [toolsOpen, setToolsOpen] = useState(true);
   const [expandedServer, setExpandedServer] = useState<string | null>(null);
   const [servers, setServers] = useState<ServerHealth[]>([]);
+  const [libOpen, setLibOpen] = useState(false);
+  const [library, setLibrary] = useState<{
+    prompts: LibraryPrompt[];
+    resources: LibraryResource[];
+  }>({ prompts: [], resources: [] });
 
   // Poll MCP server health.
   useEffect(() => {
@@ -94,6 +116,70 @@ export default function Sidebar({
       clearInterval(timer);
     };
   }, []);
+
+  // Load MCP prompts + resources (the in-app library).
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/mcp/library")
+      .then((r) => r.json())
+      .then((lib) => {
+        if (alive) setLibrary(lib);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  async function usePrompt(p: LibraryPrompt) {
+    const args: Record<string, string> = {};
+    for (const a of p.arguments ?? []) {
+      const v = window.prompt(
+        `${p.title ?? p.name} — ${a.description ?? a.name}`,
+        ""
+      );
+      if (v === null) return; // cancelled
+      args[a.name] = v;
+    }
+    try {
+      const res = await fetch("/api/mcp/fetch", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          kind: "prompt",
+          server: p.server,
+          name: p.name,
+          args,
+        }),
+      });
+      const json = await res.json();
+      if (json.text) onUseTool(json.text);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function useResource(r: LibraryResource) {
+    try {
+      const res = await fetch("/api/mcp/fetch", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          kind: "resource",
+          server: r.server,
+          uri: r.uri,
+        }),
+      });
+      const json = await res.json();
+      if (json.text) {
+        onUseTool(
+          `Context from ${r.title ?? r.name} (${r.uri}):\n\n${json.text}\n\n`
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+  }
 
   const filtered = conversations
     .filter((c) => c.title.toLowerCase().includes(query.toLowerCase()))
@@ -453,6 +539,65 @@ export default function Sidebar({
             </div>
           )}
         </div>
+
+        {library.prompts.length + library.resources.length > 0 && (
+          <div className="tools-panel">
+            <button
+              className="tools-head"
+              onClick={() => setLibOpen((v) => !v)}
+              aria-expanded={libOpen}
+            >
+              <span>Prompts &amp; resources</span>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                className={libOpen ? "chev open" : "chev"}
+              >
+                <path
+                  d="M6 9l6 6 6-6"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            {libOpen && (
+              <div className="tools-list">
+                {library.prompts.length > 0 && (
+                  <p className="lib-label">Prompts</p>
+                )}
+                {library.prompts.map((p) => (
+                  <button
+                    key={`${p.server}:${p.name}`}
+                    className="lib-item"
+                    onClick={() => usePrompt(p)}
+                    title={p.description ?? p.name}
+                  >
+                    <span className="lib-glyph">/</span>
+                    <span className="lib-text">{p.title ?? p.name}</span>
+                  </button>
+                ))}
+                {library.resources.length > 0 && (
+                  <p className="lib-label">Resources</p>
+                )}
+                {library.resources.map((r) => (
+                  <button
+                    key={`${r.server}:${r.uri}`}
+                    className="lib-item"
+                    onClick={() => useResource(r)}
+                    title={r.description ?? r.uri}
+                  >
+                    <span className="lib-glyph">@</span>
+                    <span className="lib-text">{r.title ?? r.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="sidebar-foot">
           <button className="foot-btn" onClick={onToggleTheme}>

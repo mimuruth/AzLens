@@ -28,6 +28,109 @@ type RouteAnnotation = {
   costUsd?: number;
 };
 
+type Inv = {
+  toolName: string;
+  toolCallId: string;
+  state: string;
+  args?: Record<string, unknown>;
+  result?: unknown;
+};
+
+function extractResult(result: unknown): string {
+  if (result == null) return "";
+  if (typeof result === "string") return result;
+  const r = result as { content?: { type?: string; text?: string }[] };
+  if (Array.isArray(r.content)) {
+    return r.content
+      .map((c) => c.text ?? "")
+      .join("\n")
+      .trim();
+  }
+  try {
+    return JSON.stringify(result, null, 2);
+  } catch {
+    return String(result);
+  }
+}
+
+/** A collapsible tool-call card showing the tool name, arguments, and result. */
+function ToolCard({
+  inv,
+  awaiting,
+  onApprove,
+  onDeny,
+}: {
+  inv: Inv;
+  awaiting: boolean;
+  onApprove: () => void;
+  onDeny: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const label =
+    inv.state === "result" ? "used" : awaiting ? "wants to use" : "using";
+  const resultText = inv.state === "result" ? extractResult(inv.result) : "";
+  const hasArgs = inv.args && Object.keys(inv.args).length > 0;
+  const hasDetails = hasArgs || resultText.length > 0;
+
+  return (
+    <div className={`tool-card ${awaiting ? "awaiting" : ""}`}>
+      <button
+        type="button"
+        className="tool-card-head"
+        onClick={() => hasDetails && setOpen((o) => !o)}
+        aria-expanded={open}
+      >
+        <span className={`tool-dot ${inv.state === "result" ? "" : "live"}`} />
+        <span className="tc-verb">{label}</span>
+        <code>{inv.toolName}</code>
+        {hasDetails && (
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            className={open ? "chev open" : "chev"}
+          >
+            <path
+              d="M6 9l6 6 6-6"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+      </button>
+      {open && (
+        <div className="tool-card-body">
+          {hasArgs && (
+            <>
+              <div className="tc-label">Arguments</div>
+              <pre className="tc-pre">{JSON.stringify(inv.args, null, 2)}</pre>
+            </>
+          )}
+          {resultText && (
+            <>
+              <div className="tc-label">Result</div>
+              <pre className="tc-pre">{resultText}</pre>
+            </>
+          )}
+        </div>
+      )}
+      {awaiting && (
+        <div className="tool-approve">
+          <button type="button" className="btn-approve" onClick={onApprove}>
+            Approve
+          </button>
+          <button type="button" className="btn-deny" onClick={onDeny}>
+            Deny
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ChatArea({
   id,
   providers,
@@ -468,44 +571,24 @@ export default function ChatArea({
                           );
                         }
                         if (part.type === "tool-invocation") {
-                          const inv = part.toolInvocation;
+                          const inv = part.toolInvocation as Inv;
                           const awaiting =
                             inv.state === "call" &&
                             isSensitiveTool(inv.toolName);
                           return (
-                            <div key={i} className="tool">
-                              <span className="tool-dot" />
-                              {inv.state === "result"
-                                ? "used"
-                                : awaiting
-                                  ? "wants to use"
-                                  : "using"}{" "}
-                              <code>{inv.toolName}</code>
-                              {awaiting && (
-                                <span className="tool-approve">
-                                  <button
-                                    type="button"
-                                    className="btn-approve"
-                                    onClick={() =>
-                                      approveTool(
-                                        inv.toolCallId,
-                                        inv.toolName,
-                                        inv.args
-                                      )
-                                    }
-                                  >
-                                    Approve
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="btn-deny"
-                                    onClick={() => denyTool(inv.toolCallId)}
-                                  >
-                                    Deny
-                                  </button>
-                                </span>
-                              )}
-                            </div>
+                            <ToolCard
+                              key={i}
+                              inv={inv}
+                              awaiting={awaiting}
+                              onApprove={() =>
+                                approveTool(
+                                  inv.toolCallId,
+                                  inv.toolName,
+                                  inv.args
+                                )
+                              }
+                              onDeny={() => denyTool(inv.toolCallId)}
+                            />
                           );
                         }
                         return null;

@@ -159,8 +159,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text",
-              text:
-                "No workspaceId provided and LOG_ANALYTICS_WORKSPACE_ID is not set.",
+              text: "No workspaceId provided and LOG_ANALYTICS_WORKSPACE_ID is not set.",
             },
           ],
           isError: true,
@@ -237,7 +236,10 @@ export function createServer(): McpServer {
         const text = errors.length
           ? `No results for "${query}". Source errors:\n${errors.join("\n")}`
           : `No wiki results found for "${query}".`;
-        return { content: [{ type: "text", text }], isError: errors.length > 0 };
+        return {
+          content: [{ type: "text", text }],
+          isError: errors.length > 0,
+        };
       }
 
       const body = results
@@ -254,6 +256,77 @@ export function createServer(): McpServer {
 
       return { content: [{ type: "text", text: body + footer }] };
     }
+  );
+
+  // -------------------------------------------------------------------------
+  // Resource: current Azure context (subscription + workspace)
+  // -------------------------------------------------------------------------
+  server.registerResource(
+    "azure-context",
+    "azlens://context",
+    {
+      title: "Azure Context",
+      description:
+        "The subscription and Log Analytics workspace AzLens is configured for.",
+      mimeType: "text/plain",
+    },
+    async (uri) => {
+      const text = [
+        `Subscription: ${AZURE_SUBSCRIPTION_ID || "(not set)"}`,
+        `Default Log Analytics workspace: ${DEFAULT_WORKSPACE_ID || "(not set)"}`,
+        "Auth: DefaultAzureCredential (az login locally, Managed Identity in Azure).",
+      ].join("\n");
+      return {
+        contents: [{ uri: uri.href, mimeType: "text/plain", text }],
+      };
+    }
+  );
+
+  // -------------------------------------------------------------------------
+  // Prompts: reusable Azure workflows
+  // -------------------------------------------------------------------------
+  server.registerPrompt(
+    "diagnose-resource",
+    {
+      title: "Diagnose a resource",
+      description: "Investigate the health and config of an Azure resource.",
+      argsSchema: {
+        resourceId: z.string().describe("Full ARM resource ID to diagnose."),
+      },
+    },
+    ({ resourceId }) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Use query_azure_resource on \`${resourceId}\` to inspect its configuration, then summarise potential issues and next steps. If relevant, suggest a KQL query to check its recent logs.`,
+          },
+        },
+      ],
+    })
+  );
+
+  server.registerPrompt(
+    "write-kql",
+    {
+      title: "Write a KQL query",
+      description: "Draft a Log Analytics KQL query for a goal.",
+      argsSchema: {
+        goal: z.string().describe("What you want the query to find."),
+      },
+    },
+    ({ goal }) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Write a KQL query for Azure Log Analytics that accomplishes: "${goal}". Explain each clause, then offer to run it with run_kql_query.`,
+          },
+        },
+      ],
+    })
   );
 
   return server;

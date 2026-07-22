@@ -121,5 +121,78 @@ export function createServer(): McpServer {
     }
   );
 
+  // -------------------------------------------------------------------------
+  // Resource: current to-do list
+  // -------------------------------------------------------------------------
+  server.registerResource(
+    "todo-list",
+    "assistant://todo",
+    {
+      title: "To-Do List",
+      description: "The persistent markdown to-do list.",
+      mimeType: "text/markdown",
+    },
+    async (uri) => {
+      let text: string;
+      try {
+        text = await fs.readFile(TODO_FILE, "utf-8");
+      } catch {
+        text = "# To-Do List\n\n_No tasks yet._";
+      }
+      return {
+        contents: [{ uri: uri.href, mimeType: "text/markdown", text }],
+      };
+    }
+  );
+
+  // -------------------------------------------------------------------------
+  // Resource: today's notes
+  // -------------------------------------------------------------------------
+  server.registerResource(
+    "today-notes",
+    "assistant://notes/today",
+    {
+      title: "Today's Notes",
+      description: "Markdown notes recorded for the current day.",
+      mimeType: "text/markdown",
+    },
+    async (uri) => {
+      const today = new Date().toISOString().slice(0, 10);
+      const notePath = path.join(NOTES_ROOT, `${today}.md`);
+      let text: string;
+      try {
+        text = await fs.readFile(notePath, "utf-8");
+      } catch {
+        text = `# Notes for ${today}\n\n_No notes recorded yet._`;
+      }
+      return {
+        contents: [{ uri: uri.href, mimeType: "text/markdown", text }],
+      };
+    }
+  );
+
+  // -------------------------------------------------------------------------
+  // Prompt: plan my day
+  // -------------------------------------------------------------------------
+  server.registerPrompt(
+    "plan-my-day",
+    {
+      title: "Plan my day",
+      description: "Turn today's notes and to-dos into a prioritised plan.",
+      argsSchema: {},
+    },
+    () => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: "Read today's notes with get_daily_notes and review my to-do list, then propose a prioritised plan for the day with time estimates. Highlight anything urgent.",
+          },
+        },
+      ],
+    })
+  );
+
   return server;
 }

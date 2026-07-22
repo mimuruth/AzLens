@@ -165,5 +165,115 @@ export function createServer(): McpServer {
     }
   );
 
+  // -------------------------------------------------------------------------
+  // Tool: list_directory
+  // -------------------------------------------------------------------------
+  server.registerTool(
+    "list_directory",
+    {
+      title: "List Directory",
+      description:
+        "List the files and folders in a directory inside the workspace " +
+        "(defaults to the workspace root). Folders are suffixed with '/'.",
+      inputSchema: {
+        path: z
+          .string()
+          .default(".")
+          .describe("Directory path relative to the workspace root."),
+      },
+    },
+    async ({ path: dirPath }) => {
+      const target = resolveSafePath(dirPath ?? ".");
+      const entries = await fs.readdir(target, { withFileTypes: true });
+      const listing = entries
+        .filter((e) => !IGNORED_DIRECTORIES.has(e.name))
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((e) => (e.isDirectory() ? `${e.name}/` : e.name))
+        .join("\n");
+      return {
+        content: [{ type: "text", text: listing || "(empty directory)" }],
+      };
+    }
+  );
+
+  // -------------------------------------------------------------------------
+  // Resource: workspace overview (top-level file tree)
+  // -------------------------------------------------------------------------
+  server.registerResource(
+    "workspace",
+    "coder://workspace",
+    {
+      title: "Workspace Overview",
+      description: "Top-level files and folders of the sandboxed workspace.",
+      mimeType: "text/plain",
+    },
+    async (uri) => {
+      const entries = await fs.readdir(WORKSPACE_ROOT, { withFileTypes: true });
+      const tree = entries
+        .filter((e) => !IGNORED_DIRECTORIES.has(e.name))
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((e) => (e.isDirectory() ? `${e.name}/` : e.name))
+        .join("\n");
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: "text/plain",
+            text: `Workspace root: ${WORKSPACE_ROOT}\n\n${tree}`,
+          },
+        ],
+      };
+    }
+  );
+
+  // -------------------------------------------------------------------------
+  // Prompts: reusable coding templates
+  // -------------------------------------------------------------------------
+  server.registerPrompt(
+    "review-file",
+    {
+      title: "Review a file",
+      description: "Ask for a focused code review of a file in the workspace.",
+      argsSchema: {
+        path: z.string().describe("File to review, relative to the root."),
+      },
+    },
+    ({ path: filePath }) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Read the file \`${filePath}\` with read_file, then give a concise code review covering correctness, readability, and potential bugs. Suggest concrete improvements.`,
+          },
+        },
+      ],
+    })
+  );
+
+  server.registerPrompt(
+    "explain-code",
+    {
+      title: "Explain code",
+      description: "Explain what a file or symbol does, step by step.",
+      argsSchema: {
+        target: z
+          .string()
+          .describe("A file path or a symbol/function name to explain."),
+      },
+    },
+    ({ target }) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Explain \`${target}\` step by step. If it is a file, read it first; if it is a symbol, search for it with search_code. Summarise its purpose, inputs, outputs, and any edge cases.`,
+          },
+        },
+      ],
+    })
+  );
+
   return server;
 }

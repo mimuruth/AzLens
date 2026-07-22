@@ -445,6 +445,7 @@ Then re-run `az deployment group create` passing the `*Image` parameters (see th
 | mcp-local-coder        | `read_file`            | `path`                  | Read a file inside `WORKSPACE_ROOT`                                               |
 | mcp-local-coder        | `write_file`           | `path`, `content`       | Create/overwrite a file (dirs auto-created)                                       |
 | mcp-local-coder        | `search_code`          | `query`                 | Recursive case-insensitive text search                                            |
+| mcp-local-coder        | `list_directory`       | `path?`                 | List files/folders in a workspace directory                                       |
 | AzLens-mcp             | `query_azure_resource` | `resourceId`            | Fetch an ARM resource by ID (returns a clear hint if not authenticated)           |
 | AzLens-mcp             | `run_kql_query`        | `workspaceId?`, `query` | Run a KQL query against Log Analytics (returns a clear hint if not authenticated) |
 | AzLens-mcp             | `search_wiki`          | `query`                 | Search docs — backed by Microsoft Learn; extensible to internal wikis             |
@@ -452,6 +453,18 @@ Then re-run `az deployment group create` passing the `*Image` parameters (see th
 | mcp-personal-assistant | `update_todo_list`     | `task`, `status`        | Add/update a task (`todo`/`in-progress`/`done`)                                   |
 
 > `write_file` and `update_todo_list` mutate state and are gated by **tool-approval mode** (on by default) — the model must get the user's confirmation before they run. Adjust the list in [chat-ui/lib/tools.ts](chat-ui/lib/tools.ts).
+
+### MCP resources & prompts
+
+Beyond tools, each server also exposes MCP **resources** (readable context) and **prompts** (reusable templates), surfaced in the chat-ui sidebar under **Prompts & resources**:
+
+| Server                 | Prompts                          | Resources                                     |
+| ---------------------- | -------------------------------- | --------------------------------------------- |
+| mcp-local-coder        | `review-file`, `explain-code`    | `coder://workspace`                           |
+| AzLens-mcp             | `diagnose-resource`, `write-kql` | `azlens://context`                            |
+| mcp-personal-assistant | `plan-my-day`                    | `assistant://todo`, `assistant://notes/today` |
+
+Clicking a prompt drafts its template into the composer (asking for any arguments); clicking a resource pulls its current content in as context.
 
 ---
 
@@ -474,7 +487,7 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 - Auto-growing composer — **Enter** sends, **Shift+Enter** inserts a newline.
 - **Stop** a streaming response, **Regenerate** the last answer, **Copy** any reply, and **Edit & resend** a previous user message (which trims the turns after it).
 - A small footer under each answer shows the agent, model, routed tier, and **token usage with an estimated cost** — using the provider's reported token counts when available, or a labelled `~approx` estimate (characters ÷ 4) otherwise.
-- Tool calls are shown inline as chips (e.g. `used search_wiki`).
+- Tool calls render as **collapsible cards** showing the tool name, arguments, and result (click to expand).
 
 **Models & routing**
 
@@ -513,8 +526,8 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `POST /api/chat`      | Streams a completion; connects to the MCP servers as a client and exposes their tools to the model. Accepts an optional `{ provider, model, agentId }`. Resolves the agent (system prompt + server scope) and, for `provider: "auto"`, routes by task complexity. |
 | `GET /api/models`     | Providers/models available, based on which API keys are configured on the server.                                                                                                                                                                                 |
-| `POST /api/tool`      | Executes a single MCP tool after the user approves it in the UI (used by tool-approval mode).                                                                                                                                                                     |
-| `GET /api/mcp/health` | Server-side health check of each MCP server (avoids browser CORS).                                                                                                                                                                                                |
+| `POST /api/tool`      | Executes a single MCP tool after the user approves it in the UI (used by tool-approval mode).                                                                                                                                                                     |     | `GET /api/mcp/library` | Lists MCP **prompts** and **resources** across the servers.        |
+| `POST /api/mcp/fetch` | Resolves a prompt template or reads a resource, returning text for the composer.                                                                                                                                                                                  |     | `GET /api/mcp/health`  | Server-side health check of each MCP server (avoids browser CORS). |
 
 > `search_wiki` is implemented against **Microsoft Learn** and is extensible to internal wikis (e.g. an Azure DevOps project wiki) — see [AzLens-mcp/src/wiki.ts](AzLens-mcp/src/wiki.ts).
 
