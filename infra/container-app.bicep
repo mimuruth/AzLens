@@ -26,6 +26,9 @@ param targetPort int = 3000
 @description('Environment variables for the container.')
 param envVars array = []
 
+@description('Container app secrets (inline values or Key Vault references).')
+param secrets array = []
+
 @description('Whether ingress is public (external) or internal to the environment.')
 param externalIngress bool = true
 
@@ -66,6 +69,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           identity: identityId
         }
       ]
+      secrets: secrets
     }
     template: {
       containers: [

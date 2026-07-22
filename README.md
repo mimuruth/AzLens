@@ -285,7 +285,7 @@ Point Claude Desktop / VS Code at [claude_desktop_config.json](claude_desktop_co
 
 ## Configuration reference
 
-All configuration is via environment variables. Locally use `.env` / `.env.local`; in Azure the Bicep template injects these (secrets are stored as Container Apps secrets).
+All configuration is via environment variables. Locally use `.env` / `.env.local`; in Azure the Bicep template injects these. Secrets are stored as Container Apps secrets by default, or in **Azure Key Vault** (referenced through the shared managed identity) when the `useKeyVault` deployment parameter is `true`. The `mcp-github` token is always injected as a secret — never a plaintext environment variable.
 
 ### `mcp-local-coder`
 
@@ -438,6 +438,13 @@ az role assignment create --assignee "$clientId" --role "Log Analytics Reader" \
 ```
 
 **Easy Auth** — once `ENTRA_CLIENT_ID` / `ENTRA_CLIENT_SECRET` are set and the workflow re-runs, visiting the chat-ui URL redirects to Microsoft sign-in.
+
+**Key Vault (optional)** — deploy with `useKeyVault=true` to store the Azure OpenAI key, GitHub token, and Entra client secret in a Key Vault instead of inline Container Apps secrets. The template creates the vault (RBAC-authorized), grants the shared managed identity the **Key Vault Secrets User** role, writes the provided secret values, and switches each app to reference them by `keyVaultUrl`. No app code changes are needed.
+
+```bash
+az deployment group create -g rg-mcp -f infra/main.bicep \
+  -p infra/main.parameters.json -p useKeyVault=true
+```
 
 ---
 

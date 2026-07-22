@@ -73,12 +73,18 @@ param entraClientId string = ''
 @secure()
 param entraClientSecret string = ''
 
+@description('Store secrets in Key Vault and reference them from the container apps (recommended). When false, secrets are set inline as Container Apps secrets.')
+param useKeyVault bool = false
+
 var uniqueSuffix = uniqueString(resourceGroup().id)
 var acrName = toLower('${namePrefix}acr${uniqueSuffix}')
 var logAnalyticsName = '${namePrefix}-logs-${uniqueSuffix}'
 var environmentName = '${namePrefix}-env-${uniqueSuffix}'
 var identityName = '${namePrefix}-id-${uniqueSuffix}'
+var keyVaultName = toLower('${namePrefix}kv${take(uniqueSuffix, 8)}')
+var keyVaultUri = 'https://${keyVaultName}${environment().suffixes.keyvaultDns}/'
 var targetPort = 3000
+var enableAuth = !empty(entraClientId)
 
 // AcrPull role definition ID.
 var acrPullRoleId = subscriptionResourceId(
@@ -118,6 +124,127 @@ resource acrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
     principalType: 'ServicePrincipal'
   }
 }
+
+// ---------------------------------------------------------------------------
+// Key Vault (optional) — stores app secrets, referenced by the container apps
+// through the shared managed identity instead of inlining secret values.
+// ---------------------------------------------------------------------------
+// Key Vault Secrets User role definition ID.
+var kvSecretsUserRoleId = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  '4633458b-17de-408a-b874-0445c86b69e6'
+)
+
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = if (useKeyVault) {
+  name: keyVaultName
+  location: location
+  properties: {
+    sku: {
+      family: 'A'
+      name: 'standard'
+    }
+    tenantId: tenant().tenantId
+    enableRbacAuthorization: true
+    enableSoftDelete: true
+    softDeleteRetentionInDays: 7
+    publicNetworkAccess: 'Enabled'
+  }
+}
+
+// Let the managed identity read secrets from the vault.
+resource kvSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (useKeyVault) {
+  name: guid(keyVaultName, identity.id, 'kv-secrets-user')
+  scope: keyVault
+  properties: {
+    principalId: identity.properties.principalId
+    roleDefinitionId: kvSecretsUserRoleId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource kvOpenAiSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (useKeyVault && !empty(azureOpenAiApiKey)) {
+  parent: keyVault
+  name: 'azure-openai-api-key'
+  properties: {
+    value: azureOpenAiApiKey
+  }
+}
+
+resource kvGithubSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (useKeyVault && !empty(githubToken)) {
+  parent: keyVault
+  name: 'github-token'
+  properties: {
+    value: githubToken
+  }
+}
+
+resource kvAadSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (useKeyVault && enableAuth) {
+  parent: keyVault
+  name: 'aad-client-secret'
+  properties: {
+    value: entraClientSecret
+  }
+}
+
+// Secret entries (inline value vs Key Vault reference) reused by the apps below.
+var githubTokenSecrets = empty(githubToken)
+  ? []
+  : [
+      useKeyVault
+        ? {
+            name: 'github-token'
+            keyVaultUrl: '${keyVaultUri}secrets/github-token'
+            identity: identity.id
+          }
+        : {
+            name: 'github-token'
+            value: githubToken
+          }
+    ]
+var githubTokenEnv = empty(githubToken)
+  ? []
+  : [
+      {
+        name: 'GITHUB_TOKEN'
+        secretRef: 'github-token'
+      }
+    ]
+var openAiSecrets = empty(azureOpenAiApiKey)
+  ? []
+  : [
+      useKeyVault
+        ? {
+            name: 'azure-openai-api-key'
+            keyVaultUrl: '${keyVaultUri}secrets/azure-openai-api-key'
+            identity: identity.id
+          }
+        : {
+            name: 'azure-openai-api-key'
+            value: azureOpenAiApiKey
+          }
+    ]
+var openAiKeyEnv = empty(azureOpenAiApiKey)
+  ? []
+  : [
+      {
+        name: 'AZURE_OPENAI_API_KEY'
+        secretRef: 'azure-openai-api-key'
+      }
+    ]
+var aadSecrets = !enableAuth
+  ? []
+  : [
+      useKeyVault
+        ? {
+            name: 'aad-client-secret'
+            keyVaultUrl: '${keyVaultUri}secrets/aad-client-secret'
+            identity: identity.id
+          }
+        : {
+            name: 'aad-client-secret'
+            value: entraClientSecret
+          }
+    ]
 
 // ---------------------------------------------------------------------------
 // Log Analytics + Container Apps environment.
@@ -273,6 +400,7 @@ module github 'container-app.bicep' = {
     image: githubImage
     targetPort: targetPort
     externalIngress: mcpIngressExternal
+    secrets: githubTokenSecrets
     envVars: concat(
       [
         {
@@ -284,18 +412,13 @@ module github 'container-app.bicep' = {
           value: appInsights.properties.ConnectionString
         }
       ],
-      empty(githubToken)
-        ? []
-        : [
-            {
-              name: 'GITHUB_TOKEN'
-              value: githubToken
-            }
-          ]
+      githubTokenEnv
     )
   }
   dependsOn: [
     acrPull
+    kvSecretsUser
+    kvGithubSecret
   ]
 }
 
@@ -304,8 +427,6 @@ module github 'container-app.bicep' = {
 // Declared inline (not via the shared module) because it needs secrets and,
 // optionally, Easy Auth.
 // ---------------------------------------------------------------------------
-var enableAuth = !empty(entraClientId)
-
 resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
   name: 'chat-ui'
   location: location
@@ -337,22 +458,7 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
           identity: identity.id
         }
       ]
-      secrets: concat(
-        [
-          {
-            name: 'azure-openai-api-key'
-            value: azureOpenAiApiKey
-          }
-        ],
-        enableAuth
-          ? [
-              {
-                name: 'aad-client-secret'
-                value: entraClientSecret
-              }
-            ]
-          : []
-      )
+      secrets: concat(openAiSecrets, aadSecrets)
     }
     template: {
       containers: [
@@ -363,48 +469,47 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
             cpu: json('0.5')
             memory: '1Gi'
           }
-          env: [
-            {
-              name: 'PORT'
-              value: string(targetPort)
-            }
-            {
-              name: 'AZURE_OPENAI_RESOURCE_NAME'
-              value: azureOpenAiResourceName
-            }
-            {
-              name: 'AZURE_OPENAI_DEPLOYMENT'
-              value: azureOpenAiDeployment
-            }
-            {
-              name: 'AZURE_OPENAI_API_VERSION'
-              value: azureOpenAiApiVersion
-            }
-            {
-              name: 'AZURE_OPENAI_API_KEY'
-              secretRef: 'azure-openai-api-key'
-            }
-            {
-              name: 'MCP_LOCAL_CODER_URL'
-              value: '${localCoder.outputs.fqdn}/mcp'
-            }
-            {
-              name: 'MCP_AZLENS_URL'
-              value: '${azLens.outputs.fqdn}/mcp'
-            }
-            {
-              name: 'MCP_PERSONAL_ASSISTANT_URL'
-              value: '${personalAssistant.outputs.fqdn}/mcp'
-            }
-            {
-              name: 'MCP_GITHUB_URL'
-              value: '${github.outputs.fqdn}/mcp'
-            }
-            {
-              name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
-              value: appInsights.properties.ConnectionString
-            }
-          ]
+          env: concat(
+            [
+              {
+                name: 'PORT'
+                value: string(targetPort)
+              }
+              {
+                name: 'AZURE_OPENAI_RESOURCE_NAME'
+                value: azureOpenAiResourceName
+              }
+              {
+                name: 'AZURE_OPENAI_DEPLOYMENT'
+                value: azureOpenAiDeployment
+              }
+              {
+                name: 'AZURE_OPENAI_API_VERSION'
+                value: azureOpenAiApiVersion
+              }
+              {
+                name: 'MCP_LOCAL_CODER_URL'
+                value: '${localCoder.outputs.fqdn}/mcp'
+              }
+              {
+                name: 'MCP_AZLENS_URL'
+                value: '${azLens.outputs.fqdn}/mcp'
+              }
+              {
+                name: 'MCP_PERSONAL_ASSISTANT_URL'
+                value: '${personalAssistant.outputs.fqdn}/mcp'
+              }
+              {
+                name: 'MCP_GITHUB_URL'
+                value: '${github.outputs.fqdn}/mcp'
+              }
+              {
+                name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+                value: appInsights.properties.ConnectionString
+              }
+            ],
+            openAiKeyEnv
+          )
           probes: [
             {
               type: 'Liveness'
@@ -426,6 +531,9 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
   }
   dependsOn: [
     acrPull
+    kvSecretsUser
+    kvOpenAiSecret
+    kvAadSecret
   ]
 }
 
@@ -465,6 +573,7 @@ resource chatUiAuth 'Microsoft.App/containerApps/authConfigs@2024-03-01' = if (e
 output acrLoginServer string = acr.properties.loginServer
 output acrName string = acr.name
 output appInsightsConnectionString string = appInsights.properties.ConnectionString
+output keyVaultName string = useKeyVault ? keyVaultName : ''
 output managedIdentityClientId string = identity.properties.clientId
 output managedIdentityPrincipalId string = identity.properties.principalId
 output localCoderUrl string = localCoder.outputs.fqdn
