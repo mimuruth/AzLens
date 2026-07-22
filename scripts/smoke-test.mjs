@@ -115,7 +115,10 @@ async function testLocalCoder() {
         arguments: { path: "hello.txt" },
       })
     );
-    check("write_file + read_file round-trip", read.includes("hello smoke test"));
+    check(
+      "write_file + read_file round-trip",
+      read.includes("hello smoke test")
+    );
 
     const search = textOf(
       await client.callTool({
@@ -179,10 +182,33 @@ async function testAzLens() {
     const wiki = textOf(
       await client.callTool({
         name: "search_wiki",
-        arguments: { query: "smoke" },
+        arguments: { query: "azure functions" },
       })
     );
-    check("search_wiki (stub) responds", wiki.toLowerCase().includes("stub"));
+    check("search_wiki responds with text", wiki.length > 0, wiki.slice(0, 60));
+  } finally {
+    await client.close();
+  }
+}
+
+async function testGitHub() {
+  console.log("\nmcp-github (offline checks only)");
+  const client = await connect("mcp-github", {});
+  try {
+    const names = toolNames(await client.listTools());
+    check(
+      "lists search_repositories, get_repository, list_issues",
+      ["search_repositories", "get_repository", "list_issues"].every((n) =>
+        names.includes(n)
+      ),
+      names.join(", ")
+    );
+    const prompts = (await client.listPrompts()).prompts.map((p) => p.name);
+    check(
+      "lists prompts triage-issue, summarize-repo",
+      ["triage-issue", "summarize-repo"].every((n) => prompts.includes(n)),
+      prompts.join(", ")
+    );
   } finally {
     await client.close();
   }
@@ -190,7 +216,12 @@ async function testAzLens() {
 
 async function main() {
   console.log("Running MCP smoke tests…");
-  for (const test of [testLocalCoder, testPersonalAssistant, testAzLens]) {
+  for (const test of [
+    testLocalCoder,
+    testPersonalAssistant,
+    testAzLens,
+    testGitHub,
+  ]) {
     try {
       await test();
     } catch (err) {

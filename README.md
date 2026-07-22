@@ -16,12 +16,13 @@
 
 **AzLens** is a TypeScript monorepo of three decoupled [Model Context Protocol](https://modelcontextprotocol.io) servers plus a ChatGPT-style web UI, deployable end-to-end to **Azure Container Apps** with a single GitHub Actions workflow.
 
-| Component                | Type        | Purpose                         | Tools / Role                                           |
-| ------------------------ | ----------- | ------------------------------- | ------------------------------------------------------ |
-| `mcp-local-coder`        | MCP server  | Local file system + code search | `read_file`, `write_file`, `search_code`               |
-| `AzLens-mcp`             | MCP server  | Azure ARM / KQL / Wiki          | `query_azure_resource`, `run_kql_query`, `search_wiki` |
-| `mcp-personal-assistant` | MCP server  | Notes + to-do lists             | `get_daily_notes`, `update_todo_list`                  |
-| `chat-ui`                | Next.js app | ChatGPT-style front end         | Multi-provider LLM + MCP client over all three servers |
+| Component                | Type        | Purpose                            | Tools / Role                                                                                                   |
+| ------------------------ | ----------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `mcp-local-coder`        | MCP server  | Local file system + code search    | `read_file`, `write_file`, `search_code`, `list_directory`                                                     |
+| `AzLens-mcp`             | MCP server  | Azure ARM / KQL / Wiki             | `query_azure_resource`, `run_kql_query`, `search_wiki`                                                         |
+| `mcp-personal-assistant` | MCP server  | Notes + to-do lists                | `get_daily_notes`, `update_todo_list`                                                                          |
+| `mcp-github`             | MCP server  | GitHub repos / issues / PRs / code | `search_repositories`, `get_repository`, `list_issues`, `get_issue`, `list_pull_requests`, `get_file_contents` |
+| `chat-ui`                | Next.js app | ChatGPT-style front end            | Multi-provider LLM + MCP client over all four servers                                                          |
 
 Each MCP server ships **two transports** from a single codebase:
 
@@ -299,6 +300,13 @@ Auth uses `DefaultAzureCredential`: `az login` locally, managed identity in Azur
 | `NOTES_ROOT` | `~/mcp-notes` | Directory holding `YYYY-MM-DD.md` notes and `todo.md` |
 | `PORT`       | `3000`        | HTTP port                                             |
 
+### `mcp-github`
+
+| Variable       | Default | Description                                                              |
+| -------------- | ------- | ------------------------------------------------------------------------ |
+| `GITHUB_TOKEN` | —       | Optional. Raises the rate limit (5000/h) and allows private-repo access. |
+| `PORT`         | `3000`  | HTTP port                                                                |
+
 ### `chat-ui`
 
 | Variable                       | Description                                                                                                                                                                        |
@@ -316,6 +324,7 @@ Auth uses `DefaultAzureCredential`: `az login` locally, managed identity in Azur
 | `MCP_LOCAL_CODER_URL`          | `mcp-local-coder` `/mcp` endpoint                                                                                                                                                  |
 | `MCP_AZLENS_URL`               | `AzLens-mcp` `/mcp` endpoint                                                                                                                                                       |
 | `MCP_PERSONAL_ASSISTANT_URL`   | `mcp-personal-assistant` `/mcp` endpoint                                                                                                                                           |
+| `MCP_GITHUB_URL`               | `mcp-github` `/mcp` endpoint                                                                                                                                                       |
 
 > Tool-approval mode is a per-browser UI setting (the **Approvals** toggle), not an environment variable.
 
@@ -440,17 +449,23 @@ Then re-run `az deployment group create` passing the `*Image` parameters (see th
 
 ## Tools reference
 
-| Server                 | Tool                   | Parameters              | Description                                                                       |
-| ---------------------- | ---------------------- | ----------------------- | --------------------------------------------------------------------------------- |
-| mcp-local-coder        | `read_file`            | `path`                  | Read a file inside `WORKSPACE_ROOT`                                               |
-| mcp-local-coder        | `write_file`           | `path`, `content`       | Create/overwrite a file (dirs auto-created)                                       |
-| mcp-local-coder        | `search_code`          | `query`                 | Recursive case-insensitive text search                                            |
-| mcp-local-coder        | `list_directory`       | `path?`                 | List files/folders in a workspace directory                                       |
-| AzLens-mcp             | `query_azure_resource` | `resourceId`            | Fetch an ARM resource by ID (returns a clear hint if not authenticated)           |
-| AzLens-mcp             | `run_kql_query`        | `workspaceId?`, `query` | Run a KQL query against Log Analytics (returns a clear hint if not authenticated) |
-| AzLens-mcp             | `search_wiki`          | `query`                 | Search docs — backed by Microsoft Learn; extensible to internal wikis             |
-| mcp-personal-assistant | `get_daily_notes`      | `date` (YYYY-MM-DD)     | Read that day's markdown notes                                                    |
-| mcp-personal-assistant | `update_todo_list`     | `task`, `status`        | Add/update a task (`todo`/`in-progress`/`done`)                                   |
+| Server                 | Tool                   | Parameters                      | Description                                                                       |
+| ---------------------- | ---------------------- | ------------------------------- | --------------------------------------------------------------------------------- |
+| mcp-local-coder        | `read_file`            | `path`                          | Read a file inside `WORKSPACE_ROOT`                                               |
+| mcp-local-coder        | `write_file`           | `path`, `content`               | Create/overwrite a file (dirs auto-created)                                       |
+| mcp-local-coder        | `search_code`          | `query`                         | Recursive case-insensitive text search                                            |
+| mcp-local-coder        | `list_directory`       | `path?`                         | List files/folders in a workspace directory                                       |
+| AzLens-mcp             | `query_azure_resource` | `resourceId`                    | Fetch an ARM resource by ID (returns a clear hint if not authenticated)           |
+| AzLens-mcp             | `run_kql_query`        | `workspaceId?`, `query`         | Run a KQL query against Log Analytics (returns a clear hint if not authenticated) |
+| AzLens-mcp             | `search_wiki`          | `query`                         | Search docs — backed by Microsoft Learn; extensible to internal wikis             |
+| mcp-personal-assistant | `get_daily_notes`      | `date` (YYYY-MM-DD)             | Read that day's markdown notes                                                    |
+| mcp-personal-assistant | `update_todo_list`     | `task`, `status`                | Add/update a task (`todo`/`in-progress`/`done`)                                   |
+| mcp-github             | `search_repositories`  | `query`, `limit?`               | Search public repositories with GitHub qualifiers                                 |
+| mcp-github             | `get_repository`       | `owner`, `repo`                 | Repository details (stars, language, issues)                                      |
+| mcp-github             | `list_issues`          | `owner`, `repo`, `state?`       | List issues (excludes PRs)                                                        |
+| mcp-github             | `get_issue`            | `owner`, `repo`, `number`       | Fetch a single issue with its body                                                |
+| mcp-github             | `list_pull_requests`   | `owner`, `repo`, `state?`       | List pull requests                                                                |
+| mcp-github             | `get_file_contents`    | `owner`, `repo`, `path`, `ref?` | Read a text file from a repo                                                      |
 
 > `write_file` and `update_todo_list` mutate state and are gated by **tool-approval mode** (on by default) — the model must get the user's confirmation before they run. Adjust the list in [chat-ui/lib/tools.ts](chat-ui/lib/tools.ts).
 
@@ -463,6 +478,7 @@ Beyond tools, each server also exposes MCP **resources** (readable context) and 
 | mcp-local-coder        | `review-file`, `explain-code`    | `coder://workspace`                           |
 | AzLens-mcp             | `diagnose-resource`, `write-kql` | `azlens://context`                            |
 | mcp-personal-assistant | `plan-my-day`                    | `assistant://todo`, `assistant://notes/today` |
+| mcp-github             | `triage-issue`, `summarize-repo` | `github://rate-limit`                         |
 
 Clicking a prompt drafts its template into the composer (asking for any arguments); clicking a resource pulls its current content in as context.
 

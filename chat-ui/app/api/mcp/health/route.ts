@@ -10,7 +10,11 @@ type ServerHealth = { name: string; ok: boolean; configured: boolean };
 const SERVERS = [
   { name: "mcp-local-coder", url: process.env.MCP_LOCAL_CODER_URL },
   { name: "AzLens-mcp", url: process.env.MCP_AZLENS_URL },
-  { name: "mcp-personal-assistant", url: process.env.MCP_PERSONAL_ASSISTANT_URL },
+  {
+    name: "mcp-personal-assistant",
+    url: process.env.MCP_PERSONAL_ASSISTANT_URL,
+  },
+  { name: "mcp-github", url: process.env.MCP_GITHUB_URL },
 ];
 
 async function ping(url: string): Promise<boolean> {

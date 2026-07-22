@@ -81,6 +81,7 @@ jobs:
             az acr build -r "$ACR" -t "mcp-local-coder:$SHA"        -t "mcp-local-coder:latest"        ./mcp-local-coder
             az acr build -r "$ACR" -t "azlens-mcp:$SHA"             -t "azlens-mcp:latest"             ./AzLens-mcp
             az acr build -r "$ACR" -t "mcp-personal-assistant:$SHA" -t "mcp-personal-assistant:latest" ./mcp-personal-assistant
+            az acr build -r "$ACR" -t "mcp-github:$SHA"             -t "mcp-github:latest"             ./mcp-github
             az acr build -r "$ACR" -t "chat-ui:$SHA"                -t "chat-ui:latest"                ./chat-ui
 
       - name: Deploy container apps with built images
@@ -99,6 +100,7 @@ jobs:
                  localCoderImage="$SERVER/mcp-local-coder:$SHA" \
                  azLensImage="$SERVER/azlens-mcp:$SHA" \
                  personalAssistantImage="$SERVER/mcp-personal-assistant:$SHA" \
+                 githubImage="$SERVER/mcp-github:$SHA" \
                  chatUiImage="$SERVER/chat-ui:$SHA" \
                  azureOpenAiResourceName="${{ secrets.AZURE_OPENAI_RESOURCE_NAME }}" \
                  azureOpenAiDeployment="${{ secrets.AZURE_OPENAI_DEPLOYMENT }}" \

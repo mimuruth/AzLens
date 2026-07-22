@@ -32,6 +32,13 @@ param azLensImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 @description('Container image for mcp-personal-assistant.')
 param personalAssistantImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
+@description('Container image for mcp-github.')
+param githubImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+
+@description('Optional GitHub token for mcp-github (higher rate limit / private repos).')
+@secure()
+param githubToken string = ''
+
 @description('Azure subscription ID that AzLens-mcp queries (ARM). Defaults to the current subscription.')
 param azLensSubscriptionId string = subscription().subscriptionId
 
@@ -255,6 +262,43 @@ module personalAssistant 'container-app.bicep' = {
   ]
 }
 
+module github 'container-app.bicep' = {
+  name: 'mcp-github'
+  params: {
+    name: 'mcp-github'
+    location: location
+    environmentId: acaEnvironment.id
+    identityId: identity.id
+    acrLoginServer: acr.properties.loginServer
+    image: githubImage
+    targetPort: targetPort
+    externalIngress: mcpIngressExternal
+    envVars: concat(
+      [
+        {
+          name: 'PORT'
+          value: string(targetPort)
+        }
+        {
+          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+          value: appInsights.properties.ConnectionString
+        }
+      ],
+      empty(githubToken)
+        ? []
+        : [
+            {
+              name: 'GITHUB_TOKEN'
+              value: githubToken
+            }
+          ]
+    )
+  }
+  dependsOn: [
+    acrPull
+  ]
+}
+
 // ---------------------------------------------------------------------------
 // chat-ui — ChatGPT-style front end (Azure OpenAI + MCP client).
 // Declared inline (not via the shared module) because it needs secrets and,
@@ -353,6 +397,10 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
               value: '${personalAssistant.outputs.fqdn}/mcp'
             }
             {
+              name: 'MCP_GITHUB_URL'
+              value: '${github.outputs.fqdn}/mcp'
+            }
+            {
               name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
               value: appInsights.properties.ConnectionString
             }
@@ -422,4 +470,5 @@ output managedIdentityPrincipalId string = identity.properties.principalId
 output localCoderUrl string = localCoder.outputs.fqdn
 output azLensUrl string = azLens.outputs.fqdn
 output personalAssistantUrl string = personalAssistant.outputs.fqdn
+output githubUrl string = github.outputs.fqdn
 output chatUiUrl string = 'https://${chatUi.properties.configuration.ingress.fqdn}'

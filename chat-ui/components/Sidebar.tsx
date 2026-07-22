@@ -52,6 +52,20 @@ const SERVER_TOOLS: Record<string, { name: string; example: string }[]> = {
       example: "Add 'ship v1' to my to-do list with status done",
     },
   ],
+  "mcp-github": [
+    {
+      name: "search_repositories",
+      example: "Search GitHub for popular typescript MCP repositories",
+    },
+    {
+      name: "get_repository",
+      example: "Get the GitHub repository modelcontextprotocol/servers",
+    },
+    {
+      name: "list_issues",
+      example: "List open issues in modelcontextprotocol/servers",
+    },
+  ],
 };
 
 export default function Sidebar({

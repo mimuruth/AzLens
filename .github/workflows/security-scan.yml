@@ -22,6 +22,7 @@ jobs:
           - mcp-local-coder
           - AzLens-mcp
           - mcp-personal-assistant
+          - mcp-github
           - chat-ui
     steps:
       - name: Checkout

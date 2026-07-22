@@ -5,7 +5,8 @@
  * so it can be shared by both the UI and the chat API route.
  */
 
-export type ServerKey = "local-coder" | "azlens" | "personal-assistant";
+export type ServerKey =
+  "local-coder" | "azlens" | "personal-assistant" | "github";
 
 export type Agent = {
   id: string;
@@ -26,12 +27,13 @@ export const AGENTS: Agent[] = [
     name: "General",
     description: "All tools across every MCP server.",
     glyph: "✦",
-    servers: ["local-coder", "azlens", "personal-assistant"],
+    servers: ["local-coder", "azlens", "personal-assistant", "github"],
     systemPrompt: [
-      "You are a helpful assistant with access to tools exposed by three MCP servers:",
+      "You are a helpful assistant with access to tools exposed by MCP servers:",
       "- mcp-local-coder: read/write files and search code.",
       "- AzLens-mcp: query Azure resources, run KQL log queries, and search the wiki.",
       "- mcp-personal-assistant: read daily notes and update a to-do list.",
+      "- mcp-github: search repos, read issues, pull requests, and files on GitHub.",
       "Use the tools when they help answer the user. Explain what you did concisely.",
     ].join("\n"),
   },
@@ -74,6 +76,20 @@ export const AGENTS: Agent[] = [
       "mcp-personal-assistant: get_daily_notes and update_todo_list.",
       "Help the user capture notes and keep their to-do list tidy and prioritised.",
       "Confirm changes you make to the to-do list.",
+    ].join("\n"),
+  },
+  {
+    id: "github",
+    name: "GitHub",
+    description: "Explore repositories, issues, PRs, and code on GitHub.",
+    glyph: "⑂",
+    servers: ["github"],
+    systemPrompt: [
+      "You are a GitHub research assistant. You have tools from mcp-github:",
+      "search_repositories, get_repository, list_issues, get_issue,",
+      "list_pull_requests, and get_file_contents.",
+      "Ground every answer in tool results and always include the relevant GitHub URL.",
+      "Ask for the owner/repo when it is ambiguous.",
     ].join("\n"),
   },
 ];

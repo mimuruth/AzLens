@@ -12,6 +12,7 @@ const SERVER_URLS: Record<ServerKey, string | undefined> = {
   "local-coder": process.env.MCP_LOCAL_CODER_URL,
   azlens: process.env.MCP_AZLENS_URL,
   "personal-assistant": process.env.MCP_PERSONAL_ASSISTANT_URL,
+  github: process.env.MCP_GITHUB_URL,
 };
 
 /**

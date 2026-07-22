@@ -51,6 +51,7 @@ jobs:
           - mcp-local-coder
           - AzLens-mcp
           - mcp-personal-assistant
+          - mcp-github
           - chat-ui
     steps:
       - uses: actions/checkout@v4
