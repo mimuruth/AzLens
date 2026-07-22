@@ -16,13 +16,13 @@
 
 **AzLens** is a TypeScript monorepo of three decoupled [Model Context Protocol](https://modelcontextprotocol.io) servers plus a ChatGPT-style web UI, deployable end-to-end to **Azure Container Apps** with a single GitHub Actions workflow.
 
-| Component                | Type        | Purpose                            | Tools / Role                                                                                                   |
-| ------------------------ | ----------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `mcp-local-coder`        | MCP server  | Local file system + code search    | `read_file`, `write_file`, `search_code`, `list_directory`                                                     |
-| `AzLens-mcp`             | MCP server  | Azure ARM / KQL / Wiki             | `query_azure_resource`, `run_kql_query`, `search_wiki`                                                         |
-| `mcp-personal-assistant` | MCP server  | Notes + to-do lists                | `get_daily_notes`, `update_todo_list`                                                                          |
-| `mcp-github`             | MCP server  | GitHub repos / issues / PRs / code | `search_repositories`, `get_repository`, `list_issues`, `get_issue`, `list_pull_requests`, `get_file_contents` |
-| `chat-ui`                | Next.js app | ChatGPT-style front end            | Multi-provider LLM + MCP client over all four servers                                                          |
+| Component                | Type        | Purpose                            | Tools / Role                                                                                                                                                               |
+| ------------------------ | ----------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mcp-local-coder`        | MCP server  | Local file system + code search    | `read_file`, `write_file`, `search_code`, `list_directory`                                                                                                                 |
+| `AzLens-mcp`             | MCP server  | Azure ARM / KQL / Wiki             | `query_azure_resource`, `run_kql_query`, `search_wiki`                                                                                                                     |
+| `mcp-personal-assistant` | MCP server  | Notes + to-do lists                | `get_daily_notes`, `update_todo_list`                                                                                                                                      |
+| `mcp-github`             | MCP server  | GitHub repos / issues / PRs / code | `search_repositories`, `get_repository`, `list_issues`, `get_issue`, `list_pull_requests`, `get_file_contents`, `create_issue`, `add_issue_comment`, `create_pull_request` |
+| `chat-ui`                | Next.js app | ChatGPT-style front end            | Multi-provider LLM + MCP client over all four servers                                                                                                                      |
 
 Each MCP server ships **two transports** from a single codebase:
 
@@ -33,7 +33,7 @@ Each MCP server ships **two transports** from a single codebase:
 
 A modern, claude.ai-style front end with a collapsible sidebar, **New chat**, search, and multiple conversations you can switch between (persisted in the browser). Each conversation streams responses from your chosen model and can call the MCP tools.
 
-Highlights: **multi-provider models** (Azure OpenAI / OpenAI / Anthropic / local LM Studio-style servers) with an **Auto router** that sends simple prompts to a cheap model and complex ones to a powerful model; switchable **agents** (General / Code / Azure / Personal Assistant), each scoped to the right MCP servers; **tool approval** for mutating tools; **stop / regenerate / copy / edit-and-resend**; **dark mode**; an **MCP tools health panel** (live online/offline dots); chat **rename** + date grouping; markdown rendering; file/image attachments; and a **⌘K command palette**.
+Highlights: **multi-provider models** (Azure OpenAI / OpenAI / Anthropic / local LM Studio-style servers) — cloud model lists are **auto-discovered** from each provider's `/models` API (with a curated fallback) — plus an **Auto router** that sends simple prompts to a cheap model and complex ones to a powerful model; a per-turn **usage & cost** footer (prices overridable via `PRICES_JSON`); switchable **agents** (General / Code / Azure / Personal Assistant / GitHub), each scoped to the right MCP servers; **tool approval** for mutating tools (including GitHub `create_issue` / `create_pull_request`); **stop / regenerate / copy / edit-and-resend**; **dark mode**; an **MCP tools health panel** (live online/offline dots); chat **rename** + date grouping; markdown rendering; file/image attachments; and a **⌘K command palette**.
 
 ![AzLens chat UI in dark mode: sidebar with a pinned chat and date-grouped chats, an MCP tools health panel, a model picker in the top bar, and a conversation with rendered markdown](docs/chat-ui-hero.png)
 
@@ -191,8 +191,10 @@ cd mcp-local-coder        && PORT=3001 npm run start:http
 cd AzLens-mcp             && PORT=3002 npm run start:http
 # terminal 3
 cd mcp-personal-assistant && PORT=3003 npm run start:http
+# terminal 4 (GitHub — set GITHUB_TOKEN to enable private repos + write tools)
+cd mcp-github             && PORT=3004 npm run start:http
 
-# terminal 4
+# terminal 5
 cd chat-ui
 cp .env.example .env.local   # fill in Azure OpenAI + the MCP_*_URL values above
 npm install
@@ -214,7 +216,16 @@ npm install          # once, at the repo root
 npm run smoke
 ```
 
-Expected: `8/8 checks passed. Smoke test PASSED.` Use `SKIP_BUILD=1 npm run smoke` to skip rebuilds.
+Expected: `Smoke test PASSED.` (all checks pass). Use `SKIP_BUILD=1 npm run smoke` to skip rebuilds.
+
+The chat-ui also has **Vitest** unit tests for the complexity router, cost estimator, and tool-approval gating:
+
+```bash
+cd chat-ui
+npm install && npm test
+```
+
+These run automatically in CI alongside each project's build.
 
 ### Step 2 — Interactive tool testing (MCP Inspector)
 
@@ -246,17 +257,18 @@ You can also point the Inspector at `http://localhost:3001/mcp` using the **Stre
 
 ### Step 4 — Full end-to-end (chat UI)
 
-Requires an **Azure OpenAI** resource + chat model deployment. Run the three servers on distinct ports, then the UI:
+Requires an **Azure OpenAI** resource + chat model deployment. Run the four servers on distinct ports, then the UI:
 
 ```bash
-# three terminals
+# four terminals
 cd mcp-local-coder        && PORT=3001 npm run start:http
 cd AzLens-mcp             && PORT=3002 npm run start:http
 cd mcp-personal-assistant && PORT=3003 npm run start:http
+cd mcp-github             && PORT=3004 npm run start:http
 
-# fourth terminal
+# fifth terminal
 cd chat-ui
-cp .env.example .env.local   # set AZURE_OPENAI_* and MCP_*_URL to :3001/3002/3003
+cp .env.example .env.local   # set AZURE_OPENAI_* and MCP_*_URL to :3001/3002/3003/3004
 npm install
 npm run dev                  # http://localhost:3000
 ```
@@ -302,10 +314,10 @@ Auth uses `DefaultAzureCredential`: `az login` locally, managed identity in Azur
 
 ### `mcp-github`
 
-| Variable       | Default | Description                                                              |
-| -------------- | ------- | ------------------------------------------------------------------------ |
-| `GITHUB_TOKEN` | —       | Optional. Raises the rate limit (5000/h) and allows private-repo access. |
-| `PORT`         | `3000`  | HTTP port                                                                |
+| Variable       | Default | Description                                                                                                                                                                                                   |
+| -------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GITHUB_TOKEN` | —       | Optional for reads (raises the rate limit to 5000/h and allows private repos). **Required** for the write tools (`create_issue`, `add_issue_comment`, `create_pull_request`) — use a token with `repo` scope. |
+| `PORT`         | `3000`  | HTTP port                                                                                                                                                                                                     |
 
 ### `chat-ui`
 
@@ -316,11 +328,12 @@ Auth uses `DefaultAzureCredential`: `az login` locally, managed identity in Azur
 | `AZURE_OPENAI_DEPLOYMENT`      | Chat model deployment name, e.g. `gpt-4o`                                                                                                                                          |
 | `AZURE_OPENAI_API_VERSION`     | API version, e.g. `2024-10-21`                                                                                                                                                     |
 | `AZURE_OPENAI_API_KEY`         | API key (a Container Apps secret in Azure)                                                                                                                                         |
-| `OPENAI_API_KEY`               | Optional. Enables the OpenAI provider (`OPENAI_MODEL` to override the model).                                                                                                      |
-| `ANTHROPIC_API_KEY`            | Optional. Enables the Anthropic provider (`ANTHROPIC_MODEL` to override the model).                                                                                                |
+| `OPENAI_API_KEY`               | Optional. Enables the OpenAI provider; its model list is auto-discovered from `/v1/models` (with a curated fallback). `OPENAI_MODEL` overrides the default.                        |
+| `ANTHROPIC_API_KEY`            | Optional. Enables the Anthropic provider; its model list is auto-discovered from `/v1/models` (with a curated fallback). `ANTHROPIC_MODEL` overrides the default.                  |
 | `LOCAL_OPENAI_BASE_URL`        | Optional OpenAI-compatible endpoint (LM Studio / Ollama / vLLM), e.g. `http://localhost:1234/v1`. Enables a **Local** provider whose models are auto-discovered from `/v1/models`. |
 | `LOCAL_MODEL`                  | Optional fallback local model id when `/v1/models` can't be reached; `LOCAL_OPENAI_API_KEY` / `LOCAL_LABEL` are also optional.                                                     |
 | `AUTO_SIMPLE` / `AUTO_COMPLEX` | Optional overrides for the Auto router as `provider:model` (e.g. `anthropic:claude-3-5-sonnet-latest`).                                                                            |
+| `PRICES_JSON`                  | Optional. JSON map of model-id substring → `{ "input": n, "output": n }` (USD per 1M tokens) to override/add cost-estimate prices without code changes.                            |
 | `MCP_LOCAL_CODER_URL`          | `mcp-local-coder` `/mcp` endpoint                                                                                                                                                  |
 | `MCP_AZLENS_URL`               | `AzLens-mcp` `/mcp` endpoint                                                                                                                                                       |
 | `MCP_PERSONAL_ASSISTANT_URL`   | `mcp-personal-assistant` `/mcp` endpoint                                                                                                                                           |
@@ -449,25 +462,28 @@ Then re-run `az deployment group create` passing the `*Image` parameters (see th
 
 ## Tools reference
 
-| Server                 | Tool                   | Parameters                      | Description                                                                       |
-| ---------------------- | ---------------------- | ------------------------------- | --------------------------------------------------------------------------------- |
-| mcp-local-coder        | `read_file`            | `path`                          | Read a file inside `WORKSPACE_ROOT`                                               |
-| mcp-local-coder        | `write_file`           | `path`, `content`               | Create/overwrite a file (dirs auto-created)                                       |
-| mcp-local-coder        | `search_code`          | `query`                         | Recursive case-insensitive text search                                            |
-| mcp-local-coder        | `list_directory`       | `path?`                         | List files/folders in a workspace directory                                       |
-| AzLens-mcp             | `query_azure_resource` | `resourceId`                    | Fetch an ARM resource by ID (returns a clear hint if not authenticated)           |
-| AzLens-mcp             | `run_kql_query`        | `workspaceId?`, `query`         | Run a KQL query against Log Analytics (returns a clear hint if not authenticated) |
-| AzLens-mcp             | `search_wiki`          | `query`                         | Search docs — backed by Microsoft Learn; extensible to internal wikis             |
-| mcp-personal-assistant | `get_daily_notes`      | `date` (YYYY-MM-DD)             | Read that day's markdown notes                                                    |
-| mcp-personal-assistant | `update_todo_list`     | `task`, `status`                | Add/update a task (`todo`/`in-progress`/`done`)                                   |
-| mcp-github             | `search_repositories`  | `query`, `limit?`               | Search public repositories with GitHub qualifiers                                 |
-| mcp-github             | `get_repository`       | `owner`, `repo`                 | Repository details (stars, language, issues)                                      |
-| mcp-github             | `list_issues`          | `owner`, `repo`, `state?`       | List issues (excludes PRs)                                                        |
-| mcp-github             | `get_issue`            | `owner`, `repo`, `number`       | Fetch a single issue with its body                                                |
-| mcp-github             | `list_pull_requests`   | `owner`, `repo`, `state?`       | List pull requests                                                                |
-| mcp-github             | `get_file_contents`    | `owner`, `repo`, `path`, `ref?` | Read a text file from a repo                                                      |
+| Server                 | Tool                   | Parameters                                                  | Description                                                                       |
+| ---------------------- | ---------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| mcp-local-coder        | `read_file`            | `path`                                                      | Read a file inside `WORKSPACE_ROOT`                                               |
+| mcp-local-coder        | `write_file`           | `path`, `content`                                           | Create/overwrite a file (dirs auto-created)                                       |
+| mcp-local-coder        | `search_code`          | `query`                                                     | Recursive case-insensitive text search                                            |
+| mcp-local-coder        | `list_directory`       | `path?`                                                     | List files/folders in a workspace directory                                       |
+| AzLens-mcp             | `query_azure_resource` | `resourceId`                                                | Fetch an ARM resource by ID (returns a clear hint if not authenticated)           |
+| AzLens-mcp             | `run_kql_query`        | `workspaceId?`, `query`                                     | Run a KQL query against Log Analytics (returns a clear hint if not authenticated) |
+| AzLens-mcp             | `search_wiki`          | `query`                                                     | Search docs — backed by Microsoft Learn; extensible to internal wikis             |
+| mcp-personal-assistant | `get_daily_notes`      | `date` (YYYY-MM-DD)                                         | Read that day's markdown notes                                                    |
+| mcp-personal-assistant | `update_todo_list`     | `task`, `status`                                            | Add/update a task (`todo`/`in-progress`/`done`)                                   |
+| mcp-github             | `search_repositories`  | `query`, `limit?`                                           | Search public repositories with GitHub qualifiers                                 |
+| mcp-github             | `get_repository`       | `owner`, `repo`                                             | Repository details (stars, language, issues)                                      |
+| mcp-github             | `list_issues`          | `owner`, `repo`, `state?`                                   | List issues (excludes PRs)                                                        |
+| mcp-github             | `get_issue`            | `owner`, `repo`, `number`                                   | Fetch a single issue with its body                                                |
+| mcp-github             | `list_pull_requests`   | `owner`, `repo`, `state?`                                   | List pull requests                                                                |
+| mcp-github             | `get_file_contents`    | `owner`, `repo`, `path`, `ref?`                             | Read a text file from a repo                                                      |
+| mcp-github             | `create_issue`         | `owner`, `repo`, `title`, `body?`, `labels?`                | Open a new issue (write — needs `GITHUB_TOKEN` + approval)                        |
+| mcp-github             | `add_issue_comment`    | `owner`, `repo`, `number`, `body`                           | Comment on an issue/PR (write — needs `GITHUB_TOKEN` + approval)                  |
+| mcp-github             | `create_pull_request`  | `owner`, `repo`, `title`, `head`, `base`, `body?`, `draft?` | Open a PR (write — needs `GITHUB_TOKEN` + approval)                               |
 
-> `write_file` and `update_todo_list` mutate state and are gated by **tool-approval mode** (on by default) — the model must get the user's confirmation before they run. Adjust the list in [chat-ui/lib/tools.ts](chat-ui/lib/tools.ts).
+> `write_file`, `update_todo_list`, and the GitHub write tools (`create_issue`, `add_issue_comment`, `create_pull_request`) mutate state and are gated by **tool-approval mode** (on by default) — the model must get the user's confirmation before they run. Adjust the list in [chat-ui/lib/tools.ts](chat-ui/lib/tools.ts).
 
 ### MCP resources & prompts
 

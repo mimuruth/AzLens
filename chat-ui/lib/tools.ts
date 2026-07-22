@@ -8,6 +8,9 @@ import type { ServerKey } from "@/lib/agents";
 export const SENSITIVE_TOOLS: Record<string, ServerKey> = {
   write_file: "local-coder",
   update_todo_list: "personal-assistant",
+  create_issue: "github",
+  add_issue_comment: "github",
+  create_pull_request: "github",
 };
 
 export function isSensitiveTool(name: string): boolean {

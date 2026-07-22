@@ -203,6 +203,13 @@ async function testGitHub() {
       ),
       names.join(", ")
     );
+    check(
+      "lists write tools create_issue, add_issue_comment, create_pull_request",
+      ["create_issue", "add_issue_comment", "create_pull_request"].every((n) =>
+        names.includes(n)
+      ),
+      names.join(", ")
+    );
     const prompts = (await client.listPrompts()).prompts.map((p) => p.name);
     check(
       "lists prompts triage-issue, summarize-repo",

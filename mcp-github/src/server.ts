@@ -13,43 +13,62 @@ import { z } from "zod";
 const GITHUB_API = "https://api.github.com";
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN ?? "";
 
+type GhOptions = {
+  method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+  body?: unknown;
+};
+
 /** Perform a GitHub REST request and return parsed JSON (throws on error). */
 async function gh<T = unknown>(
   path: string,
-  params?: Record<string, string | number | undefined>
+  params?: Record<string, string | number | undefined>,
+  options?: GhOptions
 ): Promise<T> {
   const url = new URL(path.startsWith("http") ? path : `${GITHUB_API}${path}`);
   for (const [k, v] of Object.entries(params ?? {})) {
     if (v !== undefined) url.searchParams.set(k, String(v));
   }
+  const method = options?.method ?? "GET";
   const headers: Record<string, string> = {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
     "User-Agent": "azlens-mcp-github",
   };
   if (GITHUB_TOKEN) headers.Authorization = `Bearer ${GITHUB_TOKEN}`;
+  const init: RequestInit = { method, headers };
+  if (options?.body !== undefined) {
+    headers["Content-Type"] = "application/json";
+    init.body = JSON.stringify(options.body);
+  }
 
-  // Retry transient failures (network errors, 5xx, and rate-limit responses)
-  // with exponential backoff, honouring GitHub's Retry-After header when given.
-  const MAX_ATTEMPTS = 3;
+  // Retry transient failures with exponential backoff, honouring GitHub's
+  // Retry-After header. Only GET is retried on network/5xx errors (writes could
+  // have applied); rate-limit (429) rejections are always safe to retry.
+  const idempotent = method === "GET";
+  const MAX_ATTEMPTS = idempotent ? 3 : 1;
   let lastError: unknown;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     let res: Response;
     try {
-      res = await fetch(url, { headers, signal: AbortSignal.timeout(15000) });
+      res = await fetch(url, { ...init, signal: AbortSignal.timeout(15000) });
     } catch (err) {
       lastError = err;
-      if (attempt < MAX_ATTEMPTS) {
+      if (idempotent && attempt < MAX_ATTEMPTS) {
         await sleep(backoffMs(attempt));
         continue;
       }
       throw err instanceof Error ? err : new Error(String(err));
     }
 
-    if (res.ok) return (await res.json()) as T;
+    if (res.ok) {
+      if (res.status === 204) return undefined as T;
+      return (await res.json().catch(() => undefined)) as T;
+    }
 
     const retryable =
-      res.status >= 500 || res.status === 429 || isRateLimited(res);
+      (res.status >= 500 && idempotent) ||
+      res.status === 429 ||
+      isRateLimited(res);
     if (retryable && attempt < MAX_ATTEMPTS) {
       await sleep(retryAfterMs(res) ?? backoffMs(attempt));
       continue;
@@ -63,14 +82,26 @@ async function gh<T = unknown>(
     } catch {
       /* non-JSON error body */
     }
-    if ((res.status === 403 || res.status === 429) && !GITHUB_TOKEN) {
-      message += " (set GITHUB_TOKEN to raise the rate limit).";
+    if ((res.status === 401 || res.status === 403) && !GITHUB_TOKEN) {
+      message +=
+        " (set GITHUB_TOKEN — write operations require authentication).";
     }
     throw new Error(message);
   }
   throw lastError instanceof Error
     ? lastError
     : new Error("GitHub API request failed after retries.");
+}
+
+/** Guard write tools: GitHub mutations require an authenticated token. */
+function requireToken(): void {
+  if (!GITHUB_TOKEN) {
+    throw new Error(
+      "This action modifies GitHub and requires authentication. " +
+        "Set the GITHUB_TOKEN environment variable (a token with 'repo' scope) " +
+        "and restart the server."
+    );
+  }
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -332,6 +363,101 @@ export function createServer(): McpServer {
           ? `${decoded.slice(0, 20000)}\n… (truncated, ${data.size} bytes total)`
           : decoded;
       return text(clipped);
+    }
+  );
+
+  // ------------------------------------------------------------------------
+  // Tool: create_issue (write — requires GITHUB_TOKEN)
+  // ------------------------------------------------------------------------
+  server.registerTool(
+    "create_issue",
+    {
+      title: "Create Issue",
+      description:
+        "Open a new issue in a repository. Requires an authenticated " +
+        "GITHUB_TOKEN with write access. This modifies GitHub.",
+      inputSchema: {
+        owner: z.string().min(1),
+        repo: z.string().min(1),
+        title: z.string().min(1).describe("Issue title."),
+        body: z.string().optional().describe("Issue body (Markdown)."),
+        labels: z
+          .array(z.string())
+          .optional()
+          .describe("Label names to apply."),
+      },
+    },
+    async ({ owner, repo, title, body, labels }) => {
+      requireToken();
+      const i = await gh<{ number: number; html_url: string }>(
+        `/repos/${owner}/${repo}/issues`,
+        undefined,
+        { method: "POST", body: { title, body, labels } }
+      );
+      return text(`Created issue #${i.number}: ${i.html_url}`);
+    }
+  );
+
+  // ------------------------------------------------------------------------
+  // Tool: add_issue_comment (write — requires GITHUB_TOKEN)
+  // ------------------------------------------------------------------------
+  server.registerTool(
+    "add_issue_comment",
+    {
+      title: "Add Issue Comment",
+      description:
+        "Add a comment to an issue or pull request. Requires an authenticated " +
+        "GITHUB_TOKEN with write access. This modifies GitHub.",
+      inputSchema: {
+        owner: z.string().min(1),
+        repo: z.string().min(1),
+        number: z.number().int().positive().describe("Issue or PR number."),
+        body: z.string().min(1).describe("Comment body (Markdown)."),
+      },
+    },
+    async ({ owner, repo, number, body }) => {
+      requireToken();
+      const c = await gh<{ html_url: string }>(
+        `/repos/${owner}/${repo}/issues/${number}/comments`,
+        undefined,
+        { method: "POST", body: { body } }
+      );
+      return text(`Comment added: ${c.html_url}`);
+    }
+  );
+
+  // ------------------------------------------------------------------------
+  // Tool: create_pull_request (write — requires GITHUB_TOKEN)
+  // ------------------------------------------------------------------------
+  server.registerTool(
+    "create_pull_request",
+    {
+      title: "Create Pull Request",
+      description:
+        "Open a pull request from an existing head branch into a base branch. " +
+        "Requires an authenticated GITHUB_TOKEN with write access. This " +
+        "modifies GitHub.",
+      inputSchema: {
+        owner: z.string().min(1),
+        repo: z.string().min(1),
+        title: z.string().min(1).describe("Pull request title."),
+        head: z
+          .string()
+          .min(1)
+          .describe("Branch with your changes (e.g. 'feature-x')."),
+        base: z.string().min(1).describe("Branch to merge into (e.g. 'main')."),
+        body: z.string().optional().describe("PR description (Markdown)."),
+        draft: z.boolean().optional().describe("Open as a draft PR."),
+      },
+    },
+    async ({ owner, repo, title, head, base, body, draft }) => {
+      requireToken();
+      const pr = await gh<{ number: number; html_url: string }>(
+        `/repos/${owner}/${repo}/pulls`,
+        undefined,
+        { method: "POST", body: { title, head, base, body, draft } }
+      );
+      return text(`Created pull request #${pr.number}: ${pr.html_url}`);
     }
   );
 
