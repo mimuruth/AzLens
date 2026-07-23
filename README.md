@@ -243,6 +243,16 @@ npm install && npm test
 
 These run automatically in CI alongside each project's build.
 
+The chat-ui also ships **Playwright** end-to-end tests for UI flows that need no model key (greeting, new chat, command palette, per-conversation instructions):
+
+```bash
+cd chat-ui
+npx playwright install chromium   # once
+npm run e2e
+```
+
+The E2E suite runs as its own CI job.
+
 ### Step 2 — Interactive tool testing (MCP Inspector)
 
 The [MCP Inspector](https://github.com/modelcontextprotocol/inspector) is a browser UI to call tools by hand — no LLM required. Best for exploring a single server.

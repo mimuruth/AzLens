@@ -71,6 +71,23 @@ jobs:
         working-directory: ${{ matrix.project }}
         run: npm test --if-present
 
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install chat-ui
+        working-directory: chat-ui
+        run: npm install --no-audit --no-fund
+      - name: Install Playwright browser
+        working-directory: chat-ui
+        run: npx playwright install --with-deps chromium
+      - name: Run E2E tests
+        working-directory: chat-ui
+        run: npm run e2e
+
   bicep:
     runs-on: ubuntu-latest
     steps:
