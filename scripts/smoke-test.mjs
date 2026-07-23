@@ -286,6 +286,41 @@ async function testKnowledge() {
   }
 }
 
+async function testPostgres() {
+  console.log("\nmcp-postgres (offline checks only)");
+  const client = await connect("mcp-postgres", {});
+  try {
+    const names = toolNames(await client.listTools());
+    check(
+      "lists list_tables, describe_table, query",
+      ["list_tables", "describe_table", "query"].every((n) =>
+        names.includes(n)
+      ),
+      names.join(", ")
+    );
+    const prompts = (await client.listPrompts()).prompts.map((p) => p.name);
+    check(
+      "lists prompt explore-schema",
+      prompts.includes("explore-schema"),
+      prompts.join(", ")
+    );
+    // A write query must be rejected even before a DB is configured path;
+    // without DATABASE_URL it returns the config hint (still non-empty).
+    const res = await client.callTool({
+      name: "query",
+      arguments: { sql: "SELECT 1" },
+    });
+    const out = textOf(res);
+    check(
+      "query returns a graceful message without a database",
+      out.length > 0,
+      out.slice(0, 60)
+    );
+  } finally {
+    await client.close();
+  }
+}
+
 async function main() {
   console.log("Running MCP smoke tests…");
   for (const test of [
@@ -295,6 +330,7 @@ async function main() {
     testGitHub,
     testAzureCost,
     testKnowledge,
+    testPostgres,
   ]) {
     try {
       await test();

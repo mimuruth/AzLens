@@ -24,7 +24,8 @@
 | `mcp-github`             | MCP server  | GitHub repos / issues / PRs / code | `search_repositories`, `get_repository`, `list_issues`, `get_issue`, `list_pull_requests`, `get_file_contents`, `create_issue`, `add_issue_comment`, `create_pull_request` |
 | `mcp-azure-cost`         | MCP server  | Azure cost analysis (FinOps)       | `query_cost`, `get_cost_forecast`, `list_budgets`                                                                                                                          |
 | `mcp-knowledge`          | MCP server  | RAG over Azure AI Search           | `search_knowledge`, `get_document`                                                                                                                                         |
-| `chat-ui`                | Next.js app | ChatGPT-style front end            | Multi-provider LLM + MCP client over all six servers                                                                                                                       |
+| `mcp-postgres`           | MCP server  | Read-only PostgreSQL queries       | `list_tables`, `describe_table`, `query`                                                                                                                                   |
+| `chat-ui`                | Next.js app | ChatGPT-style front end            | Multi-provider LLM + MCP client over all seven servers                                                                                                                     |
 
 Each MCP server ships **two transports** from a single codebase:
 
@@ -35,7 +36,7 @@ Each MCP server ships **two transports** from a single codebase:
 
 A modern, claude.ai-style front end with a collapsible sidebar, **New chat**, search, and multiple conversations you can switch between (persisted in the browser, with optional server-side sync to Azure Cosmos DB). Each conversation streams responses from your chosen model and can call the MCP tools.
 
-Highlights: **multi-provider models** (Azure OpenAI / OpenAI / Anthropic / local LM Studio-style servers) — cloud model lists are **auto-discovered** from each provider's `/models` API (with a curated fallback) — plus an **Auto router** that sends simple prompts to a cheap model and complex ones to a powerful model; a per-turn **usage & cost** footer (prices overridable via `PRICES_JSON`); switchable **agents** (General / Code / Azure / Personal Assistant / GitHub / FinOps / Research), each scoped to the right MCP servers; **per-conversation instructions** that refine the agent prompt; **syntax-highlighted code blocks** with a copy button; **tool approval** for mutating tools (including GitHub `create_issue` / `create_pull_request`); **stop / regenerate / copy / edit-and-resend**; **dark mode**; an **MCP tools health panel** (live online/offline dots); chat **rename** + date grouping; markdown rendering; file/image attachments; and a **⌘K command palette**.
+Highlights: **multi-provider models** (Azure OpenAI / OpenAI / Anthropic / local LM Studio-style servers) — cloud model lists are **auto-discovered** from each provider's `/models` API (with a curated fallback) — plus an **Auto router** that sends simple prompts to a cheap model and complex ones to a powerful model; a per-turn **usage & cost** footer (prices overridable via `PRICES_JSON`); switchable **agents** (General / Code / Azure / Personal Assistant / GitHub / FinOps / Research / Data), each scoped to the right MCP servers; **per-conversation instructions** that refine the agent prompt; **syntax-highlighted code blocks** with a copy button; **tool approval** for mutating tools (including GitHub `create_issue` / `create_pull_request`); **stop / regenerate / copy / edit-and-resend**; **dark mode**; an **MCP tools health panel** (live online/offline dots); chat **rename** + date grouping; markdown rendering; file/image attachments; and a **⌘K command palette**.
 
 ![AzLens chat UI in dark mode: sidebar with a pinned chat and date-grouped chats, an MCP tools health panel, a model picker in the top bar, and a conversation with rendered markdown](docs/chat-ui-hero.png)
 
@@ -206,8 +207,10 @@ cd mcp-github             && PORT=3004 npm run start:http
 cd mcp-azure-cost         && PORT=3005 npm run start:http
 # terminal 6 (Knowledge/RAG — needs an Azure AI Search endpoint + index)
 cd mcp-knowledge          && PORT=3006 npm run start:http
+# terminal 7 (Postgres — needs DATABASE_URL for live queries)
+cd mcp-postgres           && PORT=3007 npm run start:http
 
-# terminal 7
+# terminal 8
 cd chat-ui
 cp .env.example .env.local   # fill in Azure OpenAI + the MCP_*_URL values above
 npm install
@@ -270,20 +273,21 @@ You can also point the Inspector at `http://localhost:3001/mcp` using the **Stre
 
 ### Step 4 — Full end-to-end (chat UI)
 
-Requires an **Azure OpenAI** resource + chat model deployment. Run the six servers on distinct ports, then the UI:
+Requires an **Azure OpenAI** resource + chat model deployment. Run the seven servers on distinct ports, then the UI:
 
 ```bash
-# six terminals
+# seven terminals
 cd mcp-local-coder        && PORT=3001 npm run start:http
 cd AzLens-mcp             && PORT=3002 npm run start:http
 cd mcp-personal-assistant && PORT=3003 npm run start:http
 cd mcp-github             && PORT=3004 npm run start:http
 cd mcp-azure-cost         && PORT=3005 npm run start:http
 cd mcp-knowledge          && PORT=3006 npm run start:http
+cd mcp-postgres           && PORT=3007 npm run start:http
 
 # and the UI
 cd chat-ui
-cp .env.example .env.local   # set AZURE_OPENAI_* and MCP_*_URL to :3001..:3006
+cp .env.example .env.local   # set AZURE_OPENAI_* and MCP_*_URL to :3001..:3007
 npm install
 npm run dev                  # http://localhost:3000
 ```
@@ -355,6 +359,17 @@ Auth uses `DefaultAzureCredential` (`az login` locally, managed identity in Azur
 | `AZURE_SEARCH_SEMANTIC_CONFIG` | —         | Optional semantic configuration name to enable semantic ranking.                                 |
 | `PORT`                         | `3000`    | HTTP port                                                                                        |
 
+### `mcp-postgres`
+
+| Variable                  | Default | Description                                                                      |
+| ------------------------- | ------- | -------------------------------------------------------------------------------- |
+| `DATABASE_URL`            | —       | PostgreSQL connection string, e.g. `postgresql://user:pass@host:5432/db`.        |
+| `PGSSL`                   | on      | Set to `disable` for a local server without TLS (Azure PostgreSQL requires SSL). |
+| `PG_STATEMENT_TIMEOUT_MS` | `15000` | Per-query statement timeout in milliseconds.                                     |
+| `PORT`                    | `3000`  | HTTP port                                                                        |
+
+Queries run inside a **READ ONLY** transaction (only `SELECT`/`WITH` reach the DB), so writes are rejected by PostgreSQL itself.
+
 ### `chat-ui`
 
 | Variable                               | Description                                                                                                                                                                        |
@@ -369,11 +384,16 @@ Auth uses `DefaultAzureCredential` (`az login` locally, managed identity in Azur
 | `LOCAL_OPENAI_BASE_URL`                | Optional OpenAI-compatible endpoint (LM Studio / Ollama / vLLM), e.g. `http://localhost:1234/v1`. Enables a **Local** provider whose models are auto-discovered from `/v1/models`. |
 | `LOCAL_MODEL`                          | Optional fallback local model id when `/v1/models` can't be reached; `LOCAL_OPENAI_API_KEY` / `LOCAL_LABEL` are also optional.                                                     |
 | `AUTO_SIMPLE` / `AUTO_COMPLEX`         | Optional overrides for the Auto router as `provider:model` (e.g. `anthropic:claude-3-5-sonnet-latest`).                                                                            |
-| `PRICES_JSON`                          | Optional. JSON map of model-id substring → `{ "input": n, "output": n }` (USD per 1M tokens) to override/add cost-estimate prices without code changes.                            |     | `RATE_LIMIT_PER_MIN` | Optional. Max `/api/chat` requests per caller (Easy Auth user id or IP) per minute. `0` (default) disables it. In-memory, per-replica. |     | `MCP_LOCAL_CODER_URL` | `mcp-local-coder` `/mcp` endpoint                                                                                                                                        |
+| `PRICES_JSON`                          | Optional. JSON map of model-id substring → `{ "input": n, "output": n }` (USD per 1M tokens) to override/add cost-estimate prices without code changes.                            |
+| `RATE_LIMIT_PER_MIN`                   | Optional. Max `/api/chat` requests per caller (Easy Auth user id or IP) per minute. `0` (default) disables it. In-memory, per-replica.                                             |
+| `MCP_LOCAL_CODER_URL`                  | `mcp-local-coder` `/mcp` endpoint                                                                                                                                                  |
 | `MCP_AZLENS_URL`                       | `AzLens-mcp` `/mcp` endpoint                                                                                                                                                       |
 | `MCP_PERSONAL_ASSISTANT_URL`           | `mcp-personal-assistant` `/mcp` endpoint                                                                                                                                           |
 | `MCP_GITHUB_URL`                       | `mcp-github` `/mcp` endpoint                                                                                                                                                       |
-| `MCP_AZURE_COST_URL`                   | `mcp-azure-cost` `/mcp` endpoint                                                                                                                                                   |     | `MCP_KNOWLEDGE_URL`  | `mcp-knowledge` `/mcp` endpoint                                                                                                        |     | `COSMOS_ENDPOINT`     | Optional. Azure Cosmos DB account endpoint (AAD/managed-identity auth) to persist conversations server-side. `COSMOS_CONNECTION_STRING` is an alternative for local dev. |
+| `MCP_AZURE_COST_URL`                   | `mcp-azure-cost` `/mcp` endpoint                                                                                                                                                   |
+| `MCP_KNOWLEDGE_URL`                    | `mcp-knowledge` `/mcp` endpoint                                                                                                                                                    |
+| `MCP_POSTGRES_URL`                     | `mcp-postgres` `/mcp` endpoint                                                                                                                                                     |
+| `COSMOS_ENDPOINT`                      | Optional. Azure Cosmos DB account endpoint (AAD/managed-identity auth) to persist conversations server-side. `COSMOS_CONNECTION_STRING` is an alternative for local dev.           |
 | `COSMOS_DATABASE` / `COSMOS_CONTAINER` | Optional. Cosmos database/container names (default `azlens` / `conversations`).                                                                                                    |
 
 > Tool-approval mode is a per-browser UI setting (the **Approvals** toggle), not an environment variable.
@@ -386,7 +406,7 @@ The pipeline deploys **automatically on every push to `main`**, and can also be 
 
 **[▶ Run the deploy workflow](../../actions/workflows/deploy.yml)** _(replace with your repo URL)_
 
-Either trigger provisions the infrastructure, builds & pushes all six container images to ACR, deploys the apps, and prints each endpoint in the run summary.
+Either trigger provisions the infrastructure, builds & pushes all seven container images to ACR, deploys the apps, and prints each endpoint in the run summary.
 
 > A portal "Deploy to Azure" button is intentionally not used: these are container images that must be built and pushed to a registry, which the pipeline handles end-to-end.
 
@@ -458,7 +478,7 @@ Push to `main` (or click **Run workflow**). The pipeline:
 1. logs in via OIDC,
 2. creates the resource group,
 3. deploys `infra/main.bicep` (`mcp-infra`) to create ACR + environment + identity,
-4. builds and pushes the six images with `az acr build`,
+4. builds and pushes the seven images with `az acr build`,
 5. redeploys (`mcp-apps`) with the real image tags,
 6. prints the `chat-ui`, `mcp-local-coder`, `AzLens-mcp`, and `mcp-personal-assistant` URLs in the run summary.
 
@@ -538,6 +558,9 @@ Then re-run `az deployment group create` passing the `*Image` parameters (see th
 | mcp-azure-cost         | `list_budgets`         | —                                                           | Budgets with limit, period, and current spend                                     |
 | mcp-knowledge          | `search_knowledge`     | `query`, `top?`                                             | Semantic/keyword search over an Azure AI Search index (cited passages)            |
 | mcp-knowledge          | `get_document`         | `key`                                                       | Fetch one document from the index by key                                          |
+| mcp-postgres           | `list_tables`          | `schema?`                                                   | List tables/views in a schema                                                     |
+| mcp-postgres           | `describe_table`       | `table`, `schema?`                                          | Columns and types of a table                                                      |
+| mcp-postgres           | `query`                | `sql`, `limit?`                                             | Run a read-only SELECT/WITH query (READ ONLY txn + timeout)                       |
 
 > `write_file`, `update_todo_list`, and the GitHub write tools (`create_issue`, `add_issue_comment`, `create_pull_request`) mutate state and are gated by **tool-approval mode** (on by default) — the model must get the user's confirmation before they run. Adjust the list in [chat-ui/lib/tools.ts](chat-ui/lib/tools.ts).
 
@@ -553,6 +576,7 @@ Beyond tools, each server also exposes MCP **resources** (readable context) and 
 | mcp-github             | `triage-issue`, `summarize-repo` | `github://rate-limit`                         |
 | mcp-azure-cost         | `cost-review`                    | `azurecost://context`                         |
 | mcp-knowledge          | `rag-answer`                     | `knowledge://context`                         |
+| mcp-postgres           | `explore-schema`                 | `postgres://context`                          |
 
 Clicking a prompt drafts its template into the composer (asking for any arguments); clicking a resource pulls its current content in as context.
 
@@ -646,8 +670,8 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 - **Unit tests** — Vitest in-process tests for `mcp-local-coder` and `mcp-personal-assistant` (`npm test` in each), using the SDK's in-memory transport.
 - **Lint & format** — ESLint (`npm run lint`) for the MCP servers, Prettier (`npm run format`), an `.editorconfig`, and a **Husky pre-commit** hook that runs `lint-staged` (formats staged files).
 - **CI** ([.github/workflows/ci.yml](.github/workflows/ci.yml)) — smoke test, ESLint, per-project **build/typecheck + tests**, and **`bicep build`** on every pull request and push.
-- **Security** — [CodeQL](.github/workflows/codeql.yml) code scanning, [Trivy](.github/workflows/security-scan.yml) image scanning of all six containers, and [Dependabot](.github/dependabot.yml) updates for npm, Docker, and GitHub Actions.
-- **Observability** — set `APPLICATIONINSIGHTS_CONNECTION_STRING` and all six apps export traces, logs, and metrics to **Application Insights** via `@azure/monitor-opentelemetry` (servers: `src/telemetry.ts`; chat-ui: `instrumentation.ts`). The chat route also emits a custom **`chat.turn`** span per reply with the agent, provider, model, routed tier, and token counts. The Bicep provisions a workspace-based Application Insights resource and injects the connection string automatically. Leave it unset to disable.
+- **Security** — [CodeQL](.github/workflows/codeql.yml) code scanning, [Trivy](.github/workflows/security-scan.yml) image scanning of all seven containers, and [Dependabot](.github/dependabot.yml) updates for npm, Docker, and GitHub Actions.
+- **Observability** — set `APPLICATIONINSIGHTS_CONNECTION_STRING` and all seven apps export traces, logs, and metrics to **Application Insights** via `@azure/monitor-opentelemetry` (servers: `src/telemetry.ts`; chat-ui: `instrumentation.ts`). The chat route also emits a custom **`chat.turn`** span per reply with the agent, provider, model, routed tier, and token counts. The Bicep provisions a workspace-based Application Insights resource and injects the connection string automatically. Leave it unset to disable.
 - **Internal-only MCP option** — deploy with `mcpIngressExternal=false` to keep the MCP servers internal to the Container Apps environment (reachable only by `chat-ui`).
 
 ---

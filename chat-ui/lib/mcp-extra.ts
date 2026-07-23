@@ -14,6 +14,7 @@ const SERVER_URLS: Record<ServerKey, string | undefined> = {
   github: process.env.MCP_GITHUB_URL,
   "azure-cost": process.env.MCP_AZURE_COST_URL,
   knowledge: process.env.MCP_KNOWLEDGE_URL,
+  postgres: process.env.MCP_POSTGRES_URL,
 };
 
 /**

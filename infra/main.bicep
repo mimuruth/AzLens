@@ -51,6 +51,13 @@ param azureSearchIndex string = ''
 @secure()
 param azureSearchApiKey string = ''
 
+@description('Container image for mcp-postgres.')
+param postgresImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+
+@description('Optional PostgreSQL connection string for mcp-postgres (read-only queries). Stored as a secret.')
+@secure()
+param databaseUrl string = ''
+
 @description('Optional GitHub token for mcp-github (higher rate limit / private repos).')
 @secure()
 param githubToken string = ''
@@ -217,6 +224,14 @@ resource kvSearchSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (use
   }
 }
 
+resource kvDatabaseUrlSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (useKeyVault && !empty(databaseUrl)) {
+  parent: keyVault
+  name: 'database-url'
+  properties: {
+    value: databaseUrl
+  }
+}
+
 // Secret entries (inline value vs Key Vault reference) reused by the apps below.
 var githubTokenSecrets = empty(githubToken)
   ? []
@@ -296,6 +311,28 @@ var searchApiKeyEnv = empty(azureSearchApiKey)
       {
         name: 'AZURE_SEARCH_API_KEY'
         secretRef: 'search-api-key'
+      }
+    ]
+var databaseUrlSecrets = empty(databaseUrl)
+  ? []
+  : [
+      useKeyVault
+        ? {
+            name: 'database-url'
+            keyVaultUrl: '${keyVaultUri}secrets/database-url'
+            identity: identity.id
+          }
+        : {
+            name: 'database-url'
+            value: databaseUrl
+          }
+    ]
+var databaseUrlEnv = empty(databaseUrl)
+  ? []
+  : [
+      {
+        name: 'DATABASE_URL'
+        secretRef: 'database-url'
       }
     ]
 
@@ -637,6 +674,39 @@ module knowledge 'container-app.bicep' = {
   ]
 }
 
+module postgres 'container-app.bicep' = {
+  name: 'mcp-postgres'
+  params: {
+    name: 'mcp-postgres'
+    location: location
+    environmentId: acaEnvironment.id
+    identityId: identity.id
+    acrLoginServer: acr.properties.loginServer
+    image: postgresImage
+    targetPort: targetPort
+    externalIngress: mcpIngressExternal
+    secrets: databaseUrlSecrets
+    envVars: concat(
+      [
+        {
+          name: 'PORT'
+          value: string(targetPort)
+        }
+        {
+          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+          value: appInsights.properties.ConnectionString
+        }
+      ],
+      databaseUrlEnv
+    )
+  }
+  dependsOn: [
+    acrPull
+    kvSecretsUser
+    kvDatabaseUrlSecret
+  ]
+}
+
 // ---------------------------------------------------------------------------
 // chat-ui — ChatGPT-style front end (Azure OpenAI + MCP client).
 // Declared inline (not via the shared module) because it needs secrets and,
@@ -727,6 +797,10 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
                 value: '${knowledge.outputs.fqdn}/mcp'
               }
               {
+                name: 'MCP_POSTGRES_URL'
+                value: '${postgres.outputs.fqdn}/mcp'
+              }
+              {
                 name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
                 value: appInsights.properties.ConnectionString
               }
@@ -807,5 +881,6 @@ output personalAssistantUrl string = personalAssistant.outputs.fqdn
 output githubUrl string = github.outputs.fqdn
 output azureCostUrl string = azureCost.outputs.fqdn
 output knowledgeUrl string = knowledge.outputs.fqdn
+output postgresUrl string = postgres.outputs.fqdn
 output cosmosAccountName string = deployCosmos ? cosmosAccountName : ''
 output chatUiUrl string = 'https://${chatUi.properties.configuration.ingress.fqdn}'

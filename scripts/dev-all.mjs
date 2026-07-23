@@ -42,6 +42,7 @@ const SERVERS = [
   { name: "github", dir: "mcp-github", port: 3004, env: {} },
   { name: "cost", dir: "mcp-azure-cost", port: 3005, env: {} },
   { name: "knowledge", dir: "mcp-knowledge", port: 3006, env: {} },
+  { name: "postgres", dir: "mcp-postgres", port: 3007, env: {} },
 ];
 
 const children = [];

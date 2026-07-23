@@ -33,6 +33,10 @@ updates:
     directory: "/mcp-knowledge"
     schedule:
       interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/mcp-postgres"
+    schedule:
+      interval: "weekly"
   - package-ecosystem: "docker"
     directory: "/chat-ui"
     schedule:
@@ -59,5 +63,9 @@ updates:
       interval: "weekly"
   - package-ecosystem: "docker"
     directory: "/mcp-knowledge"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "docker"
+    directory: "/mcp-postgres"
     schedule:
       interval: "weekly"

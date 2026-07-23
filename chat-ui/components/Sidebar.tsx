@@ -96,6 +96,17 @@ const SERVER_TOOLS: Record<string, { name: string; example: string }[]> = {
       example: "Get the knowledge base document with key doc-42",
     },
   ],
+  "mcp-postgres": [
+    { name: "list_tables", example: "List the tables in the database" },
+    {
+      name: "describe_table",
+      example: "Describe the columns of the orders table",
+    },
+    {
+      name: "query",
+      example: "Run: SELECT count(*) FROM orders WHERE status = 'open'",
+    },
+  ],
 };
 
 export default function Sidebar({

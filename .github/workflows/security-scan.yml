@@ -25,6 +25,7 @@ jobs:
           - mcp-github
           - mcp-azure-cost
           - mcp-knowledge
+          - mcp-postgres
           - chat-ui
     steps:
       - name: Checkout

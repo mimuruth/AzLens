@@ -11,7 +11,8 @@ export type ServerKey =
   | "personal-assistant"
   | "github"
   | "azure-cost"
-  | "knowledge";
+  | "knowledge"
+  | "postgres";
 
 export type Agent = {
   id: string;
@@ -39,6 +40,7 @@ export const AGENTS: Agent[] = [
       "github",
       "azure-cost",
       "knowledge",
+      "postgres",
     ],
     systemPrompt: [
       "You are a helpful assistant with access to tools exposed by MCP servers:",
@@ -48,6 +50,7 @@ export const AGENTS: Agent[] = [
       "- mcp-github: search repos, read issues, pull requests, and files on GitHub.",
       "- mcp-azure-cost: analyze Azure spend, forecast cost, and review budgets.",
       "- mcp-knowledge: search a knowledge base (Azure AI Search) for grounded answers.",
+      "- mcp-postgres: list tables, describe schema, and run read-only SQL queries.",
       "Use the tools when they help answer the user. Explain what you did concisely.",
     ].join("\n"),
   },
@@ -137,6 +140,20 @@ export const AGENTS: Agent[] = [
       "Always call search_knowledge before answering, base your answer only on",
       "the retrieved passages, and cite the source titles you used. If nothing",
       "relevant is found, say so instead of guessing.",
+    ].join("\n"),
+  },
+  {
+    id: "data",
+    name: "Data Analyst",
+    description: "Explores a PostgreSQL database with read-only SQL.",
+    glyph: "\u25A4",
+    servers: ["postgres"],
+    systemPrompt: [
+      "You are a data analyst with read-only access to a PostgreSQL database.",
+      "You have tools from mcp-postgres: list_tables, describe_table, and query.",
+      "Inspect the schema before writing SQL. Only SELECT/WITH queries run; the",
+      "database rejects writes. Prefer explicit column lists and add LIMIT when",
+      "exploring. Explain results clearly and show the SQL you ran.",
     ].join("\n"),
   },
 ];

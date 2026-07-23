@@ -84,6 +84,7 @@ jobs:
             az acr build -r "$ACR" -t "mcp-github:$SHA"             -t "mcp-github:latest"             ./mcp-github
             az acr build -r "$ACR" -t "mcp-azure-cost:$SHA"         -t "mcp-azure-cost:latest"         ./mcp-azure-cost
             az acr build -r "$ACR" -t "mcp-knowledge:$SHA"          -t "mcp-knowledge:latest"          ./mcp-knowledge
+            az acr build -r "$ACR" -t "mcp-postgres:$SHA"           -t "mcp-postgres:latest"           ./mcp-postgres
             az acr build -r "$ACR" -t "chat-ui:$SHA"                -t "chat-ui:latest"                ./chat-ui
 
       - name: Deploy container apps with built images
@@ -105,6 +106,7 @@ jobs:
                  githubImage="$SERVER/mcp-github:$SHA" \
                  azureCostImage="$SERVER/mcp-azure-cost:$SHA" \
                  knowledgeImage="$SERVER/mcp-knowledge:$SHA" \
+                 postgresImage="$SERVER/mcp-postgres:$SHA" \
                  chatUiImage="$SERVER/chat-ui:$SHA" \
                  azureOpenAiResourceName="${{ secrets.AZURE_OPENAI_RESOURCE_NAME }}" \
                  azureOpenAiDeployment="${{ secrets.AZURE_OPENAI_DEPLOYMENT }}" \
