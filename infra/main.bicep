@@ -102,6 +102,12 @@ param useKeyVault bool = true
 @description('Deploy an Azure Cosmos DB account and persist chat-ui conversations there (AAD/managed-identity auth). When false, conversations stay in the browser only.')
 param deployCosmos bool = false
 
+@description('Deploy an Azure Cache for Redis and use it for cluster-wide /api/chat rate limiting. When false, rate limiting is per-replica in-memory.')
+param deployRedis bool = false
+
+@description('Max /api/chat requests per caller per minute. 0 disables rate limiting.')
+param rateLimitPerMin int = 0
+
 var uniqueSuffix = uniqueString(resourceGroup().id)
 var acrName = toLower('${namePrefix}acr${uniqueSuffix}')
 var logAnalyticsName = '${namePrefix}-logs-${uniqueSuffix}'
@@ -113,6 +119,7 @@ var cosmosAccountName = toLower('${namePrefix}cosmos${take(uniqueSuffix, 8)}')
 var cosmosDatabaseName = 'azlens'
 var cosmosContainerName = 'conversations'
 var cosmosEndpoint = 'https://${cosmosAccountName}.documents.azure.com:443/'
+var redisName = toLower('${namePrefix}redis${take(uniqueSuffix, 8)}')
 var targetPort = 3000
 var enableAuth = !empty(entraClientId)
 
@@ -458,6 +465,69 @@ var cosmosEnv = deployCosmos
   : []
 
 // ---------------------------------------------------------------------------
+// Redis (optional) — cluster-wide rate limiting for /api/chat.
+// ---------------------------------------------------------------------------
+resource redis 'Microsoft.Cache/redis@2024-03-01' = if (deployRedis) {
+  name: redisName
+  location: location
+  properties: {
+    sku: {
+      name: 'Basic'
+      family: 'C'
+      capacity: 0
+    }
+    enableNonSslPort: false
+    minimumTlsVersion: '1.2'
+  }
+}
+
+var redisHost = '${redisName}.redis.cache.windows.net'
+var redisConnString = deployRedis
+  ? 'rediss://:${listKeys(resourceId('Microsoft.Cache/redis', redisName), '2024-03-01').primaryKey}@${redisHost}:6380'
+  : ''
+var redisSecrets = !deployRedis
+  ? []
+  : [
+      useKeyVault
+        ? {
+            name: 'redis-url'
+            keyVaultUrl: '${keyVaultUri}secrets/redis-url'
+            identity: identity.id
+          }
+        : {
+            name: 'redis-url'
+            value: redisConnString
+          }
+    ]
+var redisEnv = !deployRedis
+  ? []
+  : [
+      {
+        name: 'REDIS_URL'
+        secretRef: 'redis-url'
+      }
+    ]
+var rateLimitEnv = rateLimitPerMin > 0
+  ? [
+      {
+        name: 'RATE_LIMIT_PER_MIN'
+        value: string(rateLimitPerMin)
+      }
+    ]
+  : []
+
+resource kvRedisSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (useKeyVault && deployRedis) {
+  parent: keyVault
+  name: 'redis-url'
+  properties: {
+    value: redisConnString
+  }
+  dependsOn: [
+    redis
+  ]
+}
+
+// ---------------------------------------------------------------------------
 // The three MCP container apps.
 // ---------------------------------------------------------------------------
 module localCoder 'container-app.bicep' = {
@@ -743,7 +813,7 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
           identity: identity.id
         }
       ]
-      secrets: concat(openAiSecrets, aadSecrets)
+      secrets: concat(openAiSecrets, aadSecrets, redisSecrets)
     }
     template: {
       containers: [
@@ -805,7 +875,7 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
                 value: appInsights.properties.ConnectionString
               }
             ],
-            concat(openAiKeyEnv, cosmosEnv)
+            concat(openAiKeyEnv, cosmosEnv, redisEnv, rateLimitEnv)
           )
           probes: [
             {
@@ -821,7 +891,7 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
         }
       ]
       scale: {
-        minReplicas: 1
+        minReplicas: 2
         maxReplicas: 3
       }
     }
@@ -831,6 +901,8 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
     kvSecretsUser
     kvOpenAiSecret
     kvAadSecret
+    kvRedisSecret
+    redis
     cosmosDataRole
     cosmosContainer
   ]
@@ -883,4 +955,5 @@ output azureCostUrl string = azureCost.outputs.fqdn
 output knowledgeUrl string = knowledge.outputs.fqdn
 output postgresUrl string = postgres.outputs.fqdn
 output cosmosAccountName string = deployCosmos ? cosmosAccountName : ''
+output redisHostName string = deployRedis ? redisHost : ''
 output chatUiUrl string = 'https://${chatUi.properties.configuration.ingress.fqdn}'

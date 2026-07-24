@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   // Optional per-caller rate limit (requests/min). 0 (default) disables it.
   const limit = Number(process.env.RATE_LIMIT_PER_MIN ?? 0);
   if (limit > 0) {
-    const gate = rateLimit(callerKey(new Headers(req.headers)), limit);
+    const gate = await rateLimit(callerKey(new Headers(req.headers)), limit);
     if (!gate.ok) {
       return new Response(
         "Rate limit exceeded. Please wait a moment and try again.",

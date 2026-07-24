@@ -395,7 +395,8 @@ Queries run inside a **READ ONLY** transaction (only `SELECT`/`WITH` reach the D
 | `LOCAL_MODEL`                          | Optional fallback local model id when `/v1/models` can't be reached; `LOCAL_OPENAI_API_KEY` / `LOCAL_LABEL` are also optional.                                                     |
 | `AUTO_SIMPLE` / `AUTO_COMPLEX`         | Optional overrides for the Auto router as `provider:model` (e.g. `anthropic:claude-3-5-sonnet-latest`).                                                                            |
 | `PRICES_JSON`                          | Optional. JSON map of model-id substring → `{ "input": n, "output": n }` (USD per 1M tokens) to override/add cost-estimate prices without code changes.                            |
-| `RATE_LIMIT_PER_MIN`                   | Optional. Max `/api/chat` requests per caller (Easy Auth user id or IP) per minute. `0` (default) disables it. In-memory, per-replica.                                             |
+| `RATE_LIMIT_PER_MIN`                   | Optional. Max `/api/chat` requests per caller (Easy Auth user id or IP) per minute. `0` (default) disables it.                                                                     |
+| `REDIS_URL`                            | Optional. Redis connection string for **cluster-wide** rate limiting across replicas (e.g. Azure Cache for Redis). Without it the limiter is per-replica in-memory.                |
 | `MCP_LOCAL_CODER_URL`                  | `mcp-local-coder` `/mcp` endpoint                                                                                                                                                  |
 | `MCP_AZLENS_URL`                       | `AzLens-mcp` `/mcp` endpoint                                                                                                                                                       |
 | `MCP_PERSONAL_ASSISTANT_URL`           | `mcp-personal-assistant` `/mcp` endpoint                                                                                                                                           |
@@ -518,6 +519,13 @@ az deployment group create -g rg-mcp -f infra/main.bicep \
 ```bash
 az deployment group create -g rg-mcp -f infra/main.bicep \
   -p infra/main.parameters.json -p deployCosmos=true
+```
+
+**Rate limiting (optional)** — set `rateLimitPerMin` to cap `/api/chat` requests per caller, and `deployRedis=true` to provision an **Azure Cache for Redis** so the limit is enforced **cluster-wide** across chat-ui replicas (the template injects `REDIS_URL` as a secret). Without Redis the limiter is per-replica in-memory; if Redis is configured but unreachable it fails open to in-memory.
+
+```bash
+az deployment group create -g rg-mcp -f infra/main.bicep \
+  -p infra/main.parameters.json -p deployRedis=true -p rateLimitPerMin=30
 ```
 
 ---
@@ -688,9 +696,9 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 
 ## Operations & hardening
 
-- **MCP session state is in-memory per replica.** The MCP servers therefore deploy with **`maxReplicas: 1`** (in [infra/container-app.bicep](infra/container-app.bicep)). To scale a server beyond one replica, enable session affinity or externalize sessions (e.g. Redis); otherwise a client's follow-up request may hit a replica that doesn't know the session. `chat-ui` is stateless per request and scales freely.
+- **MCP session state is in-memory per replica.** The MCP servers therefore deploy with **`maxReplicas: 1`** (in [infra/container-app.bicep](infra/container-app.bicep)). To scale a server beyond one replica, enable session affinity or externalize sessions (e.g. Redis); otherwise a client's follow-up request may hit a replica that doesn't know the session. `chat-ui` is stateless per request and deploys with **`minReplicas: 2`** for availability.
+- **Rate limiting.** Set `rateLimitPerMin` to throttle `/api/chat`; deploy `deployRedis=true` (Azure Cache for Redis) for **cluster-wide** limits across the two chat-ui replicas — otherwise the limiter is per-replica in-memory.
 - **Ephemeral storage.** `mcp-local-coder` (`/app/workspace`) and `mcp-personal-assistant` (`/app/notes`) write to the container's ephemeral disk. Mount an Azure Files volume for persistence.
-- **MCP servers are publicly reachable.** Only `chat-ui` is behind Easy Auth. To restrict the MCP servers to the chat UI, switch their ingress to `internal` in the Bicep and use internal FQDNs.
 - **Reproducible builds.** Run `npm install` in each project once, commit the `package-lock.json`, then switch the Dockerfiles from `npm install` to `npm ci`.
 - **Least privilege.** Scope `WORKSPACE_ROOT` narrowly and grant `AzLens-mcp` only the RBAC roles it needs.
 
