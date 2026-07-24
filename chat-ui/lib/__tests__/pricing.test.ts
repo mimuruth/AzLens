@@ -20,19 +20,19 @@ describe("estimateCost", () => {
     expect(cost).toBeCloseTo(0.15, 6);
   });
 
-  it("prices the newly added models", () => {
+  it("prices Claude models", () => {
     expect(
-      estimateCost("claude-opus-4-8", {
+      estimateCost("claude-3-5-sonnet-latest", {
         promptTokens: 1_000_000,
         completionTokens: 0,
       })
-    ).toBeCloseTo(15, 6);
+    ).toBeCloseTo(3, 6);
     expect(
-      estimateCost("gpt-5.6-terra", {
+      estimateCost("claude-3-5-haiku-latest", {
         promptTokens: 0,
         completionTokens: 1_000_000,
       })
-    ).toBeCloseTo(15, 6);
+    ).toBeCloseTo(4, 6);
   });
 
   it("returns null for an unknown model", () => {

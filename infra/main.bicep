@@ -68,8 +68,8 @@ param azLensSubscriptionId string = subscription().subscriptionId
 @description('Optional Log Analytics workspace (customer) ID used by AzLens-mcp run_kql_query.')
 param azLensLogAnalyticsCustomerId string = ''
 
-@description('Expose the MCP servers publicly (true) or keep them internal to the environment, reachable only by chat-ui (false).')
-param mcpIngressExternal bool = true
+@description('Expose the MCP servers publicly (true) or keep them internal to the environment, reachable only by chat-ui (false). Defaults to internal for a production-safe posture.')
+param mcpIngressExternal bool = false
 
 // --- chat-ui (ChatGPT-style front end) ---------------------------------------
 
@@ -96,8 +96,8 @@ param entraClientId string = ''
 @secure()
 param entraClientSecret string = ''
 
-@description('Store secrets in Key Vault and reference them from the container apps (recommended). When false, secrets are set inline as Container Apps secrets.')
-param useKeyVault bool = false
+@description('Store secrets in Key Vault and reference them from the container apps (recommended, default). Set false to inline secrets as Container Apps secrets instead.')
+param useKeyVault bool = true
 
 @description('Deploy an Azure Cosmos DB account and persist chat-ui conversations there (AAD/managed-identity auth). When false, conversations stay in the browser only.')
 param deployCosmos bool = false

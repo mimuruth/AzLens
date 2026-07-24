@@ -506,11 +506,11 @@ az role assignment create --assignee "$clientId" --role "Log Analytics Reader" \
 
 **Easy Auth** — once `ENTRA_CLIENT_ID` / `ENTRA_CLIENT_SECRET` are set and the workflow re-runs, visiting the chat-ui URL redirects to Microsoft sign-in.
 
-**Key Vault (optional)** — deploy with `useKeyVault=true` to store the Azure OpenAI key, GitHub token, and Entra client secret in a Key Vault instead of inline Container Apps secrets. The template creates the vault (RBAC-authorized), grants the shared managed identity the **Key Vault Secrets User** role, writes the provided secret values, and switches each app to reference them by `keyVaultUrl`. No app code changes are needed.
+**Key Vault (default on)** — `useKeyVault` defaults to `true`, so the Azure OpenAI key, GitHub token, Postgres connection string, Search key, and Entra client secret are stored in a Key Vault instead of inline Container Apps secrets. The template creates the vault (RBAC-authorized), grants the shared managed identity the **Key Vault Secrets User** role, writes the provided secret values, and switches each app to reference them by `keyVaultUrl`. Set `-p useKeyVault=false` to inline secrets instead (not recommended).
 
 ```bash
 az deployment group create -g rg-mcp -f infra/main.bicep \
-  -p infra/main.parameters.json -p useKeyVault=true
+  -p infra/main.parameters.json -p useKeyVault=false
 ```
 
 **Conversation persistence (optional)** — deploy with `deployCosmos=true` to provision an **Azure Cosmos DB** account (AAD-only; local auth disabled) and persist chat history server-side. The template creates the `azlens`/`conversations` database + container, grants the managed identity the **Cosmos DB Built-in Data Contributor** data-plane role, and injects `COSMOS_ENDPOINT` into chat-ui. Conversations are mirrored from the browser (write-through) and hydrated on a fresh device; when `deployCosmos` is off, chat-ui uses `localStorage` only.
@@ -682,13 +682,13 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 - **CI** ([.github/workflows/ci.yml](.github/workflows/ci.yml)) — smoke test, ESLint, per-project **build/typecheck + tests**, and **`bicep build`** on every pull request and push.
 - **Security** — [CodeQL](.github/workflows/codeql.yml) code scanning, [Trivy](.github/workflows/security-scan.yml) image scanning of all seven containers, and [Dependabot](.github/dependabot.yml) updates for npm, Docker, and GitHub Actions.
 - **Observability** — set `APPLICATIONINSIGHTS_CONNECTION_STRING` and all seven apps export traces, logs, and metrics to **Application Insights** via `@azure/monitor-opentelemetry` (servers: `src/telemetry.ts`; chat-ui: `instrumentation.ts`). The chat route also emits a custom **`chat.turn`** span per reply with the agent, provider, model, routed tier, and token counts. The Bicep provisions a workspace-based Application Insights resource and injects the connection string automatically. Leave it unset to disable.
-- **Internal-only MCP option** — deploy with `mcpIngressExternal=false` to keep the MCP servers internal to the Container Apps environment (reachable only by `chat-ui`).
+- **Internal-only MCP servers (default)** — the MCP servers deploy with **internal** ingress (`mcpIngressExternal=false`), reachable only by `chat-ui` within the Container Apps environment. Set `mcpIngressExternal=true` to expose them publicly (e.g. for the MCP Inspector).
 
 ---
 
 ## Operations & hardening
 
-- **Session state is in-memory per replica.** For `maxReplicas > 1`, enable session affinity or externalize sessions (e.g. Redis); otherwise a client's follow-up request may hit a replica that doesn't know the session.
+- **MCP session state is in-memory per replica.** The MCP servers therefore deploy with **`maxReplicas: 1`** (in [infra/container-app.bicep](infra/container-app.bicep)). To scale a server beyond one replica, enable session affinity or externalize sessions (e.g. Redis); otherwise a client's follow-up request may hit a replica that doesn't know the session. `chat-ui` is stateless per request and scales freely.
 - **Ephemeral storage.** `mcp-local-coder` (`/app/workspace`) and `mcp-personal-assistant` (`/app/notes`) write to the container's ephemeral disk. Mount an Azure Files volume for persistence.
 - **MCP servers are publicly reachable.** Only `chat-ui` is behind Easy Auth. To restrict the MCP servers to the chat UI, switch their ingress to `internal` in the Bicep and use internal FQDNs.
 - **Reproducible builds.** Run `npm install` in each project once, commit the `package-lock.json`, then switch the Dockerfiles from `npm install` to `npm ci`.

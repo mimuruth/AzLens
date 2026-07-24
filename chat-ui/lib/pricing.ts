@@ -10,14 +10,9 @@ const PRICES: Record<string, Price> = {
   "gpt-4o-mini": { input: 0.15, output: 0.6 },
   "gpt-4o": { input: 2.5, output: 10 },
   "o3-mini": { input: 1.1, output: 4.4 },
-  "gpt-5.6-sol": { input: 1.25, output: 10 },
-  "gpt-5.6-terra": { input: 5, output: 15 },
   "claude-3-5-haiku": { input: 0.8, output: 4 },
   "claude-3-5-sonnet": { input: 3, output: 15 },
   "claude-3-7-sonnet": { input: 3, output: 15 },
-  "claude-sonnet-5": { input: 3, output: 15 },
-  "claude-opus-4-8": { input: 15, output: 75 },
-  "fable-5": { input: 3, output: 15 },
 };
 
 /**

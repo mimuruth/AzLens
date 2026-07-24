@@ -101,13 +101,7 @@ export async function GET(): Promise<Response> {
     });
   }
   if (process.env.OPENAI_API_KEY) {
-    const curated = [
-      "gpt-5.6-sol",
-      "gpt-5.6-terra",
-      "gpt-4o",
-      "gpt-4o-mini",
-      "o3-mini",
-    ];
+    const curated = ["gpt-4o", "gpt-4o-mini", "o3-mini"];
     const discovered = await discoverOpenAiModels();
     providers.push({
       id: "openai",
@@ -116,13 +110,7 @@ export async function GET(): Promise<Response> {
     });
   }
   if (process.env.ANTHROPIC_API_KEY) {
-    const curated = [
-      "claude-opus-4-8",
-      "claude-sonnet-5",
-      "fable-5",
-      "claude-3-5-sonnet-latest",
-      "claude-3-5-haiku-latest",
-    ];
+    const curated = ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"];
     const discovered = await discoverAnthropicModels();
     providers.push({
       id: "anthropic",

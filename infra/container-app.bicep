@@ -35,8 +35,8 @@ param externalIngress bool = true
 @description('Minimum replica count.')
 param minReplicas int = 1
 
-@description('Maximum replica count.')
-param maxReplicas int = 3
+@description('Maximum replica count. Defaults to 1 because the MCP StreamableHTTP transport keeps session state in-process; raising this requires sticky sessions or externalised session state.')
+param maxReplicas int = 1
 
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: name
