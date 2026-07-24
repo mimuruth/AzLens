@@ -429,6 +429,57 @@ body {
   margin-top: 2px;
 }
 
+/* User avatar (mirrors the assistant logo on the opposite side) */
+.avatar-user {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: var(--brand-grad);
+  margin-top: 2px;
+}
+
+/* Topbar spacer pushes the controls to the right */
+.topbar-spacer {
+  flex: 1;
+}
+
+/* Subtle enter animation for messages */
+@keyframes msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.msg {
+  animation: msg-in 0.18s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .msg {
+    animation: none;
+  }
+}
+
+/* Consistent keyboard focus ring */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
 /* ---- Tool call chip ---- */
 .tool {
   display: inline-flex;
@@ -537,35 +588,52 @@ code {
   color: inherit;
 }
 
-/* ---- Code block with copy button + syntax highlighting ---- */
+/* ---- Code block with language label + copy button + highlighting ---- */
 .code-block {
-  position: relative;
   margin: 0 0 12px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px 6px 14px;
+  background: #211f1a;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.code-lang {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #b9b4a8;
 }
 
 .code-block pre {
   margin: 0;
+  border-radius: 0;
+  min-height: 40px;
+}
+
+/* highlight.js base: keep the pre's background, ensure readable base text */
+.markdown pre code.hljs {
+  background: transparent;
+  color: #f5f4ef;
 }
 
 .code-copy {
-  position: absolute;
-  top: 8px;
-  right: 8px;
   padding: 3px 10px;
   font-size: 12px;
   color: #d8d6cf;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 6px;
   cursor: pointer;
-  opacity: 0;
-  transition:
-    opacity 0.12s ease,
-    background 0.12s ease;
-}
-
-.code-block:hover .code-copy {
-  opacity: 1;
+  transition: background 0.12s ease;
 }
 
 .code-copy:hover {
@@ -1309,12 +1377,11 @@ code {
 }
 
 .model-picker {
-  margin-left: auto;
   max-width: 240px;
 }
 
 .agent-picker {
-  margin-left: auto;
+  margin-left: 8px;
   max-width: 200px;
 }
 
@@ -1696,4 +1763,59 @@ code {
 .send.stop {
   background: var(--text);
   color: var(--surface);
+}
+
+/* ---- Responsive: tablet & mobile ---- */
+@media (max-width: 900px) {
+  .topbar {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .topbar::-webkit-scrollbar {
+    display: none;
+  }
+  .model-picker {
+    max-width: 160px;
+  }
+  .agent-picker {
+    max-width: 150px;
+  }
+}
+
+@media (max-width: 720px) {
+  /* Sidebar becomes an overlay drawer; the toggle opens/closes it. */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    z-index: 60;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.28);
+  }
+  .sidebar.is-collapsed {
+    width: 0;
+    box-shadow: none;
+  }
+  .app {
+    width: 100%;
+  }
+  .conversation {
+    padding: 8px 12px 20px;
+  }
+  .msg.user .content {
+    max-width: 88%;
+  }
+  .greeting h1 {
+    font-size: 24px;
+  }
+  /* Show icons but drop the text labels on the topbar toggles to save space. */
+  .approval-toggle {
+    font-size: 0;
+    gap: 0;
+    padding: 6px;
+  }
+  .approval-toggle svg {
+    width: 16px;
+    height: 16px;
+  }
 }

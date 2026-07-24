@@ -1,7 +1,13 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  isValidElement,
+  type ReactNode,
+} from "react";
 import type { UIMessage } from "ai";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -133,10 +139,16 @@ function ToolCard({
   );
 }
 
-/** A code block with a copy button; the inner <code> is highlighted by rehype. */
+/** A code block with a language label + copy button; highlighted by rehype. */
 function CodeBlock({ children }: { children?: ReactNode }) {
   const ref = useRef<HTMLPreElement>(null);
   const [copied, setCopied] = useState(false);
+  let lang = "";
+  if (isValidElement(children)) {
+    const cls = (children.props as { className?: string })?.className ?? "";
+    const m = /language-([\w-]+)/.exec(cls);
+    if (m) lang = m[1];
+  }
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(ref.current?.innerText ?? "");
@@ -148,9 +160,12 @@ function CodeBlock({ children }: { children?: ReactNode }) {
   };
   return (
     <div className="code-block">
-      <button type="button" className="code-copy" onClick={copy}>
-        {copied ? "Copied" : "Copy"}
-      </button>
+      <div className="code-head">
+        <span className="code-lang">{lang || "code"}</span>
+        <button type="button" className="code-copy" onClick={copy}>
+          {copied ? "Copied ✓" : "Copy"}
+        </button>
+      </div>
       <pre ref={ref}>{children}</pre>
     </div>
   );
@@ -442,6 +457,7 @@ export default function ChatArea({
         <span className="topbar-title wordmark">
           <span className="wm-accent">Az</span>Lens
         </span>
+        <div className="topbar-spacer" />
         <button
           type="button"
           className={`approval-toggle ${requireApproval ? "on" : "off"}`}
@@ -759,6 +775,11 @@ export default function ChatArea({
                     </>
                   )}
                 </div>
+                {message.role === "user" && (
+                  <div className="avatar-user" aria-hidden="true">
+                    You
+                  </div>
+                )}
               </div>
             ))}
             {isBusy && (
