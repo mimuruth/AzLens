@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Conversation, Project } from "@/lib/storage";
+import type { Conversation, Project, ProjectFile } from "@/lib/storage";
 
 /**
  * Modal to manage projects: create, rename, delete, edit shared instructions,
- * and open a project (which filters the sidebar to that project's chats). A
- * project's instructions are prepended to every chat in it.
+ * upload grounding files, reorder (drag or arrows), and open a project (which
+ * filters the sidebar to that project's chats). A project's instructions and
+ * files are prepended to every chat in it.
  */
 export default function ProjectsModal({
   projects,
@@ -19,6 +20,10 @@ export default function ProjectsModal({
   onSetInstructions,
   onSelect,
   onMoveProject,
+  onReorderProjects,
+  onAddFile,
+  onRemoveFile,
+  fileMax,
 }: {
   projects: Project[];
   activeProjectId: string | null;
@@ -30,11 +35,20 @@ export default function ProjectsModal({
   onSetInstructions: (id: string, text: string) => void;
   onSelect: (id: string | null) => void;
   onMoveProject: (id: string, dir: "up" | "down") => void;
+  onReorderProjects: (fromId: string, toId: string) => void;
+  onAddFile: (id: string, file: ProjectFile) => void;
+  onRemoveFile: (id: string, fileId: string) => void;
+  fileMax: number;
 }) {
   const [name, setName] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [filesId, setFilesId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropId, setDropId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadTarget = useRef<string | null>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -62,6 +76,32 @@ export default function ProjectsModal({
       setExpandedId(p.id);
       setDraft(p.instructions ?? "");
     }
+  };
+
+  const pickFiles = (projectId: string) => {
+    uploadTarget.current = projectId;
+    fileInputRef.current?.click();
+  };
+
+  const genId = () =>
+    "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  const onFilesChosen = async (list: FileList | null) => {
+    const projectId = uploadTarget.current;
+    if (!projectId || !list) return;
+    for (const file of Array.from(list)) {
+      const raw = await file.text();
+      const content = raw.length > fileMax ? raw.slice(0, fileMax) : raw;
+      onAddFile(projectId, {
+        id: genId(),
+        name: file.name,
+        size: file.size,
+        content,
+      });
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   return (
@@ -127,9 +167,36 @@ export default function ProjectsModal({
               key={p.id}
               className={`project-item ${
                 activeProjectId === p.id ? "active" : ""
+              } ${dragId === p.id ? "dragging" : ""} ${
+                dropId === p.id ? "drop-target" : ""
               }`}
+              draggable
+              onDragStart={(e) => {
+                setDragId(p.id);
+                e.dataTransfer.effectAllowed = "move";
+              }}
+              onDragOver={(e) => {
+                if (dragId && dragId !== p.id) {
+                  e.preventDefault();
+                  setDropId(p.id);
+                }
+              }}
+              onDragLeave={() => setDropId((d) => (d === p.id ? null : d))}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (dragId && dragId !== p.id) onReorderProjects(dragId, p.id);
+                setDragId(null);
+                setDropId(null);
+              }}
+              onDragEnd={() => {
+                setDragId(null);
+                setDropId(null);
+              }}
             >
               <div className="project-row">
+                <span className="project-drag-handle" title="Drag to reorder">
+                  ⠿
+                </span>
                 <button
                   type="button"
                   className="project-open"
@@ -179,6 +246,15 @@ export default function ProjectsModal({
                   </button>
                   <button
                     type="button"
+                    className="msg-action"
+                    onClick={() =>
+                      setFilesId((v) => (v === p.id ? null : p.id))
+                    }
+                  >
+                    Files{p.files?.length ? ` (${p.files.length})` : ""}
+                  </button>
+                  <button
+                    type="button"
                     className="msg-action danger"
                     onClick={() => {
                       if (
@@ -222,10 +298,59 @@ export default function ProjectsModal({
                   </div>
                 </div>
               )}
+              {filesId === p.id && (
+                <div className="project-files">
+                  <div className="project-files-head">
+                    <span className="project-files-hint">
+                      Text files added here ground every chat in this project.
+                    </span>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={() => pickFiles(p.id)}
+                    >
+                      Add files
+                    </button>
+                  </div>
+                  {p.files && p.files.length > 0 ? (
+                    <ul className="project-files-list">
+                      {p.files.map((f) => (
+                        <li key={f.id} className="project-file">
+                          <span className="project-file-name" title={f.name}>
+                            {f.name}
+                          </span>
+                          <span className="project-file-size">
+                            {Math.max(1, Math.round(f.content.length / 1024))}{" "}
+                            KB
+                          </span>
+                          <button
+                            type="button"
+                            className="msg-action danger"
+                            onClick={() => onRemoveFile(p.id, f.id)}
+                            aria-label={`Remove ${f.name}`}
+                          >
+                            Remove
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="project-files-empty">No files yet.</p>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
       </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        hidden
+        accept=".txt,.md,.markdown,.json,.csv,.tsv,.ts,.tsx,.js,.jsx,.py,.yaml,.yml,.html,.css,.sql,.xml,.log,text/*"
+        onChange={(e) => onFilesChosen(e.target.files)}
+      />
     </div>
   );
 }

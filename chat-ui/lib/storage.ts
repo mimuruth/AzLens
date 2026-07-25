@@ -222,13 +222,51 @@ export function saveTemplates(list: PromptTemplate[]): void {
 
 // ---- Projects (Claude-style chat grouping + shared instructions) -----------
 
+/** A small text file attached to a project and injected as grounding context. */
+export type ProjectFile = {
+  id: string;
+  name: string;
+  size: number;
+  content: string;
+};
+
 export type Project = {
   id: string;
   name: string;
   instructions?: string;
   createdAt: number;
   order?: number;
+  /** Uploaded text files that ground every chat in the project. */
+  files?: ProjectFile[];
 };
+
+/** Max characters kept per project file (keeps localStorage + Cosmos small). */
+export const PROJECT_FILE_MAX = 100_000;
+
+/**
+ * Build the grounding context injected into every chat in a project: the shared
+ * instructions followed by the text of any uploaded files, fenced by name.
+ */
+export function projectContext(project?: {
+  instructions?: string;
+  files?: ProjectFile[];
+}): string {
+  if (!project) return "";
+  const parts: string[] = [];
+  if (project.instructions?.trim()) parts.push(project.instructions.trim());
+  const files = project.files ?? [];
+  if (files.length > 0) {
+    const blocks = files
+      .map((f) => `## ${f.name}\n\n${f.content}`)
+      .join("\n\n");
+    parts.push(
+      "The following project files are provided as reference context. " +
+        "Use them to ground your answers when relevant.\n\n" +
+        blocks
+    );
+  }
+  return parts.join("\n\n");
+}
 
 const PROJECTS_KEY = "azlens.projects";
 const ACTIVE_PROJECT_KEY = "azlens.activeProject";

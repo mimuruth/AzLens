@@ -102,6 +102,13 @@ export async function deleteConversation(
 
 // ---- Projects (stored in the same container, tagged docType='project') ------
 
+export type ProjectFile = {
+  id: string;
+  name: string;
+  size: number;
+  content: string;
+};
+
 export type StoredProject = {
   id: string;
   userId: string;
@@ -110,6 +117,7 @@ export type StoredProject = {
   instructions?: string;
   createdAt: number;
   order?: number;
+  files?: ProjectFile[];
 };
 
 export type ProjectMeta = Omit<StoredProject, "userId" | "docType">;
@@ -120,7 +128,7 @@ export async function listProjects(userId: string): Promise<ProjectMeta[]> {
   const { resources } = await container.items
     .query<ProjectMeta>({
       query:
-        'SELECT c.id, c.name, c.instructions, c.createdAt, c["order"] ' +
+        'SELECT c.id, c.name, c.instructions, c.createdAt, c["order"], c.files ' +
         "FROM c WHERE c.userId = @u AND c.docType = 'project' ORDER BY c.createdAt DESC",
       parameters: [{ name: "@u", value: userId }],
     })

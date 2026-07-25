@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import hljs from "highlight.js";
+import JsonTree from "@/components/JsonTree";
 import { loadMessages } from "@/lib/storage";
 import {
   extractArtifacts,
@@ -12,7 +13,7 @@ import {
 } from "@/lib/artifacts";
 import { downloadFile } from "@/lib/transfer";
 
-const PREVIEWABLE = new Set(["html", "markdown", "md"]);
+const PREVIEWABLE = new Set(["html", "markdown", "md", "svg", "json"]);
 
 /** Syntax-highlight code with highlight.js; escapes content, so it's safe. */
 function highlight(content: string, lang: string): string {
@@ -84,6 +85,20 @@ export default function ArtifactsPanel({
     }
   };
 
+  const copyAll = async () => {
+    if (artifacts.length === 0) return;
+    const joined = artifacts
+      .map((a) => "```" + a.lang + "\n" + a.content + "\n```")
+      .join("\n\n");
+    try {
+      await navigator.clipboard.writeText(joined);
+      setCopiedId("__all__");
+      setTimeout(() => setCopiedId(null), 1200);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
+
   const togglePreview = (id: string) =>
     setPreviewIds((prev) => {
       const next = new Set(prev);
@@ -124,6 +139,16 @@ export default function ArtifactsPanel({
             Artifacts{artifacts.length > 0 ? ` (${artifacts.length})` : ""}
           </span>
           <div className="artifacts-head-actions">
+            {artifacts.length > 0 && (
+              <button
+                type="button"
+                className="msg-action"
+                onClick={copyAll}
+                title="Copy all artifacts to the clipboard"
+              >
+                {copiedId === "__all__" ? "Copied ✓" : "Copy all"}
+              </button>
+            )}
             {artifacts.length > 0 && (
               <button
                 type="button"
@@ -209,13 +234,17 @@ export default function ArtifactsPanel({
                     </div>
                   </div>
                   {showPreview ? (
-                    a.lang === "html" ? (
+                    a.lang === "html" || a.lang === "svg" ? (
                       <iframe
                         className="artifact-preview-frame"
                         sandbox=""
                         srcDoc={a.content}
                         title={`preview-${a.id}`}
                       />
+                    ) : a.lang === "json" ? (
+                      <div className="artifact-preview">
+                        <JsonTree text={a.content} />
+                      </div>
                     ) : (
                       <div className="artifact-preview markdown">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>

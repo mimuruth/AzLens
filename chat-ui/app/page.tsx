@@ -15,6 +15,7 @@ import {
   type Bookmark,
   type PromptTemplate,
   type Project,
+  type ProjectFile,
   loadConversations,
   saveConversations,
   loadActive,
@@ -40,6 +41,8 @@ import {
   saveProjects,
   loadActiveProject,
   saveActiveProject,
+  projectContext,
+  PROJECT_FILE_MAX,
   newId,
 } from "@/lib/storage";
 import { DEFAULT_AGENT_ID } from "@/lib/agents";
@@ -496,6 +499,53 @@ export default function Page() {
     });
   }, []);
 
+  const reorderProjects = useCallback((fromId: string, toId: string) => {
+    if (fromId === toId) return;
+    setProjects((prev) => {
+      const from = prev.findIndex((p) => p.id === fromId);
+      const to = prev.findIndex((p) => p.id === toId);
+      if (from < 0 || to < 0) return prev;
+      const list = [...prev];
+      const [moved] = list.splice(from, 1);
+      list.splice(to, 0, moved);
+      const ordered = list.map((p, i) => ({ ...p, order: i }));
+      saveProjects(ordered);
+      ordered.forEach((p) => cloudSaveProject(p));
+      return ordered;
+    });
+  }, []);
+
+  const addProjectFile = useCallback((id: string, file: ProjectFile) => {
+    setProjects((prev) => {
+      const list = prev.map((p) => {
+        if (p.id !== id) return p;
+        const files = [
+          ...(p.files ?? []).filter((f) => f.name !== file.name),
+          file,
+        ];
+        return { ...p, files };
+      });
+      saveProjects(list);
+      const updated = list.find((p) => p.id === id);
+      if (updated) cloudSaveProject(updated);
+      return list;
+    });
+  }, []);
+
+  const removeProjectFile = useCallback((id: string, fileId: string) => {
+    setProjects((prev) => {
+      const list = prev.map((p) =>
+        p.id === id
+          ? { ...p, files: (p.files ?? []).filter((f) => f.id !== fileId) }
+          : p
+      );
+      saveProjects(list);
+      const updated = list.find((p) => p.id === id);
+      if (updated) cloudSaveProject(updated);
+      return list;
+    });
+  }, []);
+
   const deleteProject = useCallback(
     (id: string) => {
       setProjects((prev) => {
@@ -603,7 +653,7 @@ export default function Page() {
   const projectForActiveChat = activeConvo?.projectId
     ? projects.find((p) => p.id === activeConvo.projectId)
     : undefined;
-  const projectInstructions = projectForActiveChat?.instructions ?? "";
+  const projectInstructions = projectContext(projectForActiveChat);
   const visibleConversations = activeProjectId
     ? conversations.filter((c) => c.projectId === activeProjectId)
     : conversations;
@@ -676,6 +726,10 @@ export default function Page() {
           onSetInstructions={setProjectInstructions}
           onSelect={selectProject}
           onMoveProject={moveProject}
+          onReorderProjects={reorderProjects}
+          onAddFile={addProjectFile}
+          onRemoveFile={removeProjectFile}
+          fileMax={PROJECT_FILE_MAX}
         />
       )}
       {paletteOpen && (
