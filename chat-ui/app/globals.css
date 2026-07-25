@@ -1105,7 +1105,7 @@ code {
   font-size: 16px;
   line-height: 1.5;
   color: var(--text);
-  min-height: 48px;
+  min-height: 72px;
   max-height: 200px;
   padding: 8px 0;
 }
