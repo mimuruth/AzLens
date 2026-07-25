@@ -207,6 +207,7 @@ export default function ChatArea({
   onToggleApproval,
   instructions,
   onSetInstructions,
+  projectInstructions,
   templates,
   onSaveTemplate,
   onBookmark,
@@ -224,6 +225,7 @@ export default function ChatArea({
   onToggleApproval: () => void;
   instructions: string;
   onSetInstructions: (text: string) => void;
+  projectInstructions: string;
   templates: PromptTemplate[];
   onSaveTemplate: (title: string, text: string) => void;
   onBookmark: (message: UIMessage) => void;
@@ -241,6 +243,8 @@ export default function ChatArea({
   approvalRef.current = requireApproval;
   const instructionsRef = useRef(instructions);
   instructionsRef.current = instructions;
+  const projectInstructionsRef = useRef(projectInstructions);
+  projectInstructionsRef.current = projectInstructions;
   const modeRef = useRef<string | null>(null);
 
   const {
@@ -261,18 +265,27 @@ export default function ChatArea({
     initialMessages: loadMessages(id),
     // Auto-continue after a tool result is added (e.g. after an approval).
     maxSteps: 5,
-    experimental_prepareRequestBody: ({ messages }) => ({
-      messages,
-      agentId: agentIdRef.current,
-      requireApproval: approvalRef.current,
-      ...(instructionsRef.current
-        ? { instructions: instructionsRef.current }
-        : {}),
-      ...(modeRef.current ? { mode: modeRef.current } : {}),
-      ...(modelRef.current
-        ? { provider: modelRef.current.provider, model: modelRef.current.model }
-        : {}),
-    }),
+    experimental_prepareRequestBody: ({ messages }) => {
+      const mergedInstructions = [
+        projectInstructionsRef.current,
+        instructionsRef.current,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      return {
+        messages,
+        agentId: agentIdRef.current,
+        requireApproval: approvalRef.current,
+        ...(mergedInstructions ? { instructions: mergedInstructions } : {}),
+        ...(modeRef.current ? { mode: modeRef.current } : {}),
+        ...(modelRef.current
+          ? {
+              provider: modelRef.current.provider,
+              model: modelRef.current.model,
+            }
+          : {}),
+      };
+    },
   });
 
   const isBusy = status === "submitted" || status === "streaming";

@@ -14,6 +14,8 @@ export type Conversation = {
   model?: ModelSelection;
   /** Optional per-conversation system instructions appended to the agent prompt. */
   instructions?: string;
+  /** Project this conversation belongs to (Claude-style grouping). */
+  projectId?: string;
 };
 
 export type Theme = "light" | "dark";
@@ -201,7 +203,6 @@ export function saveBookmarks(list: Bookmark[]): void {
 }
 
 // ---- Prompt templates (reusable snippets) ----------------------------------
-
 export type PromptTemplate = { id: string; title: string; text: string };
 
 const TEMPLATES_KEY = "azlens.templates";
@@ -217,6 +218,41 @@ export function loadTemplates(): PromptTemplate[] {
 
 export function saveTemplates(list: PromptTemplate[]): void {
   if (hasWindow()) localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list));
+}
+
+// ---- Projects (Claude-style chat grouping + shared instructions) -----------
+
+export type Project = {
+  id: string;
+  name: string;
+  instructions?: string;
+  createdAt: number;
+};
+
+const PROJECTS_KEY = "azlens.projects";
+const ACTIVE_PROJECT_KEY = "azlens.activeProject";
+
+export function loadProjects(): Project[] {
+  if (!hasWindow()) return [];
+  try {
+    return JSON.parse(localStorage.getItem(PROJECTS_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+export function saveProjects(list: Project[]): void {
+  if (hasWindow()) localStorage.setItem(PROJECTS_KEY, JSON.stringify(list));
+}
+
+export function loadActiveProject(): string | null {
+  return hasWindow() ? localStorage.getItem(ACTIVE_PROJECT_KEY) : null;
+}
+
+export function saveActiveProject(id: string | null): void {
+  if (!hasWindow()) return;
+  if (id) localStorage.setItem(ACTIVE_PROJECT_KEY, id);
+  else localStorage.removeItem(ACTIVE_PROJECT_KEY);
 }
 
 // ---- Cross-conversation message search -------------------------------------

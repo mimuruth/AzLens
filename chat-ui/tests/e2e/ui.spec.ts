@@ -82,3 +82,17 @@ test("opens the artifacts panel", async ({ page }) => {
   await page.getByRole("button", { name: "Close artifacts" }).click();
   await expect(page.getByText(/No artifacts yet/i)).toBeHidden();
 });
+
+test("creates and opens a project", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Projects" }).click();
+  await expect(page.getByRole("dialog", { name: "Projects" })).toBeVisible();
+  await page.getByPlaceholder("New project name…").fill("Demo Project");
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  const openBtn = page.locator("button.project-open", {
+    hasText: "Demo Project",
+  });
+  await expect(openBtn).toBeVisible();
+  await openBtn.click();
+  await expect(page.locator(".project-banner-name")).toHaveText("Demo Project");
+});

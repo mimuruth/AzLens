@@ -6,6 +6,7 @@ import Sidebar from "@/components/Sidebar";
 import ChatArea from "@/components/ChatArea";
 import CommandPalette from "@/components/CommandPalette";
 import ArtifactsPanel from "@/components/ArtifactsPanel";
+import ProjectsModal from "@/components/ProjectsModal";
 import {
   type Conversation,
   type Theme,
@@ -13,6 +14,7 @@ import {
   type ModelProvider,
   type Bookmark,
   type PromptTemplate,
+  type Project,
   loadConversations,
   saveConversations,
   loadActive,
@@ -34,6 +36,10 @@ import {
   saveBookmarks,
   loadTemplates,
   saveTemplates,
+  loadProjects,
+  saveProjects,
+  loadActiveProject,
+  saveActiveProject,
   newId,
 } from "@/lib/storage";
 import { DEFAULT_AGENT_ID } from "@/lib/agents";
@@ -56,6 +62,9 @@ export default function Page() {
   const [agentId, setAgentId] = useState<string>(DEFAULT_AGENT_ID);
   const [requireApproval, setRequireApproval] = useState(true);
   const [artifactsOpen, setArtifactsOpen] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [projectsOpen, setProjectsOpen] = useState(false);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
   const [prefill, setPrefill] = useState<{
@@ -78,6 +87,8 @@ export default function Page() {
     setRequireApproval(loadApproval());
     setBookmarks(loadBookmarks());
     setTemplates(loadTemplates());
+    setProjects(loadProjects());
+    setActiveProjectId(loadActiveProject());
 
     void (async () => {
       let list = loadConversations();
@@ -174,13 +185,19 @@ export default function Page() {
   const newChat = useCallback(() => {
     const id = newId();
     setConversations((prev) => {
-      const list = [{ id, title: "New chat", updatedAt: Date.now() }, ...prev];
+      const convo: Conversation = {
+        id,
+        title: "New chat",
+        updatedAt: Date.now(),
+        ...(activeProjectId ? { projectId: activeProjectId } : {}),
+      };
+      const list = [convo, ...prev];
       saveConversations(list);
       return list;
     });
     setActiveId(id);
     saveActive(id);
-  }, []);
+  }, [activeProjectId]);
 
   const selectChat = useCallback((id: string) => {
     setActiveId(id);
@@ -411,6 +428,87 @@ export default function Page() {
     });
   }, []);
 
+  const createProject = useCallback((name: string) => {
+    setProjects((prev) => {
+      const list = [{ id: newId(), name, createdAt: Date.now() }, ...prev];
+      saveProjects(list);
+      return list;
+    });
+  }, []);
+
+  const renameProject = useCallback((id: string, name: string) => {
+    setProjects((prev) => {
+      const list = prev.map((p) => (p.id === id ? { ...p, name } : p));
+      saveProjects(list);
+      return list;
+    });
+  }, []);
+
+  const setProjectInstructions = useCallback((id: string, text: string) => {
+    setProjects((prev) => {
+      const list = prev.map((p) =>
+        p.id === id ? { ...p, instructions: text } : p
+      );
+      saveProjects(list);
+      return list;
+    });
+  }, []);
+
+  const deleteProject = useCallback(
+    (id: string) => {
+      setProjects((prev) => {
+        const list = prev.filter((p) => p.id !== id);
+        saveProjects(list);
+        return list;
+      });
+      // Un-group the project's chats rather than deleting them.
+      setConversations((prev) => {
+        const list = prev.map((c) =>
+          c.projectId === id ? { ...c, projectId: undefined } : c
+        );
+        saveConversations(list);
+        return list;
+      });
+      if (activeProjectId === id) {
+        setActiveProjectId(null);
+        saveActiveProject(null);
+      }
+    },
+    [activeProjectId]
+  );
+
+  const selectProject = useCallback((id: string | null) => {
+    setActiveProjectId(id);
+    saveActiveProject(id);
+    setProjectsOpen(false);
+    if (id) {
+      const inProject = conversationsRef.current.filter(
+        (c) => c.projectId === id
+      );
+      if (inProject.length > 0) {
+        setActiveId(inProject[0].id);
+        saveActive(inProject[0].id);
+      } else {
+        const nid = newId();
+        setConversations((prev) => {
+          const list = [
+            {
+              id: nid,
+              title: "New chat",
+              updatedAt: Date.now(),
+              projectId: id,
+            },
+            ...prev,
+          ];
+          saveConversations(list);
+          return list;
+        });
+        setActiveId(nid);
+        saveActive(nid);
+      }
+    }
+  }, []);
+
   // Persist messages and keep the conversation title/order in sync.
   const handleMessages = useCallback((id: string, messages: UIMessage[]) => {
     saveMessages(id, messages);
@@ -439,13 +537,23 @@ export default function Page() {
 
   if (!ready) return null;
 
-  const activeInstructions =
-    conversations.find((c) => c.id === activeId)?.instructions ?? "";
+  const activeConvo = conversations.find((c) => c.id === activeId);
+  const activeInstructions = activeConvo?.instructions ?? "";
+  const activeProject = activeProjectId
+    ? (projects.find((p) => p.id === activeProjectId) ?? null)
+    : null;
+  const projectForActiveChat = activeConvo?.projectId
+    ? projects.find((p) => p.id === activeConvo.projectId)
+    : undefined;
+  const projectInstructions = projectForActiveChat?.instructions ?? "";
+  const visibleConversations = activeProjectId
+    ? conversations.filter((c) => c.projectId === activeProjectId)
+    : conversations;
 
   return (
     <div className={`layout ${collapsed ? "collapsed" : ""}`}>
       <Sidebar
-        conversations={conversations}
+        conversations={visibleConversations}
         activeId={activeId}
         collapsed={collapsed}
         theme={theme}
@@ -466,6 +574,9 @@ export default function Page() {
         onInsertTemplate={useTool}
         onRemoveTemplate={removeTemplate}
         onOpenArtifacts={() => setArtifactsOpen(true)}
+        onOpenProjects={() => setProjectsOpen(true)}
+        activeProjectName={activeProject?.name ?? null}
+        onExitProject={() => selectProject(null)}
       />
       <ChatArea
         key={activeId}
@@ -479,6 +590,7 @@ export default function Page() {
         onToggleApproval={toggleApproval}
         instructions={activeInstructions}
         onSetInstructions={changeInstructions}
+        projectInstructions={projectInstructions}
         templates={templates}
         onSaveTemplate={saveTemplate}
         onBookmark={addBookmark}
@@ -490,6 +602,19 @@ export default function Page() {
         <ArtifactsPanel
           conversationId={activeId}
           onClose={() => setArtifactsOpen(false)}
+        />
+      )}
+      {projectsOpen && (
+        <ProjectsModal
+          projects={projects}
+          activeProjectId={activeProjectId}
+          conversations={conversations}
+          onClose={() => setProjectsOpen(false)}
+          onCreate={createProject}
+          onRename={renameProject}
+          onDelete={deleteProject}
+          onSetInstructions={setProjectInstructions}
+          onSelect={selectProject}
         />
       )}
       {paletteOpen && (
