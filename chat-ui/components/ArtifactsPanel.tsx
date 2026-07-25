@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import hljs from "highlight.js";
 import { loadMessages } from "@/lib/storage";
 import {
   extractArtifacts,
@@ -12,6 +13,20 @@ import {
 import { downloadFile } from "@/lib/transfer";
 
 const PREVIEWABLE = new Set(["html", "markdown", "md"]);
+
+/** Syntax-highlight code with highlight.js; escapes content, so it's safe. */
+function highlight(content: string, lang: string): string {
+  try {
+    if (lang && hljs.getLanguage(lang)) {
+      return hljs.highlight(content, { language: lang }).value;
+    }
+    return hljs.highlightAuto(content).value;
+  } catch {
+    return content.replace(/[&<>]/g, (c) =>
+      c === "&" ? "&amp;" : c === "<" ? "&lt;" : "&gt;"
+    );
+  }
+}
 
 /**
  * Right-side drawer that lists the artifacts (code / doc / table blocks) the
@@ -77,6 +92,30 @@ export default function ArtifactsPanel({
       return next;
     });
 
+  const downloadAll = async () => {
+    if (artifacts.length === 0) return;
+    const { default: JSZip } = await import("jszip");
+    const zip = new JSZip();
+    const used: Record<string, number> = {};
+    for (const a of artifacts) {
+      let name = artifactFileName(a);
+      if (used[name]) {
+        const n = used[name]++;
+        name = name.replace(/(\.[^.]+)$/, `-${n}$1`);
+      } else {
+        used[name] = 1;
+      }
+      zip.file(name, a.content);
+    }
+    const blob = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "artifacts.zip";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="artifacts-overlay" onClick={onClose}>
       <aside className="artifacts-panel" onClick={(e) => e.stopPropagation()}>
@@ -85,6 +124,16 @@ export default function ArtifactsPanel({
             Artifacts{artifacts.length > 0 ? ` (${artifacts.length})` : ""}
           </span>
           <div className="artifacts-head-actions">
+            {artifacts.length > 0 && (
+              <button
+                type="button"
+                className="msg-action"
+                onClick={downloadAll}
+                title="Download all as a zip"
+              >
+                Download all
+              </button>
+            )}
             <button
               type="button"
               className="msg-action"
@@ -176,9 +225,17 @@ export default function ArtifactsPanel({
                     )
                   ) : (
                     <pre className="artifact-code">
-                      {a.content.length > 4000
-                        ? `${a.content.slice(0, 4000)}\n…`
-                        : a.content}
+                      <code
+                        className="hljs"
+                        dangerouslySetInnerHTML={{
+                          __html: highlight(
+                            a.content.length > 4000
+                              ? `${a.content.slice(0, 4000)}\n…`
+                              : a.content,
+                            a.lang
+                          ),
+                        }}
+                      />
                     </pre>
                   )}
                 </div>
