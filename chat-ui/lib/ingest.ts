@@ -49,3 +49,25 @@ export function toolResultText(result: unknown): string {
     .join(" ")
     .trim();
 }
+
+/**
+ * The exact index document keys a single file was ingested as. Deterministic
+ * and identical to the ids produced by chunkProjectForIngest, so removing a
+ * file can delete precisely its passages from the index.
+ */
+export function fileIngestKeys(
+  projectId: string,
+  file: { id: string; content?: string },
+  chunkSize: number = INGEST_CHUNK_SIZE
+): string[] {
+  const size = chunkSize > 0 ? chunkSize : INGEST_CHUNK_SIZE;
+  const text = file.content ?? "";
+  const parts = Math.max(1, Math.ceil(text.length / size));
+  const keys: string[] = [];
+  for (let i = 0; i < parts; i++) {
+    const slice = text.slice(i * size, (i + 1) * size).trim();
+    if (!slice) continue;
+    keys.push(`${projectId}-${file.id}-${i}`);
+  }
+  return keys;
+}

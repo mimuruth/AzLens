@@ -46,7 +46,11 @@ import {
   newId,
 } from "@/lib/storage";
 import { DEFAULT_AGENT_ID } from "@/lib/agents";
-import { chunkProjectForIngest, toolResultText } from "@/lib/ingest";
+import {
+  chunkProjectForIngest,
+  toolResultText,
+  fileIngestKeys,
+} from "@/lib/ingest";
 import {
   cloudInit,
   cloudMessages,
@@ -89,6 +93,8 @@ export default function Page() {
   // Mirror of conversations for stable reads inside effects/callbacks.
   const conversationsRef = useRef<Conversation[]>([]);
   conversationsRef.current = conversations;
+  const projectsRef = useRef<Project[]>([]);
+  projectsRef.current = projects;
 
   // Load persisted state on mount (client only, avoids hydration mismatch).
   useEffect(() => {
@@ -533,19 +539,60 @@ export default function Page() {
     });
   }, []);
 
-  const removeProjectFile = useCallback((id: string, fileId: string) => {
-    setProjects((prev) => {
-      const list = prev.map((p) =>
-        p.id === id
-          ? { ...p, files: (p.files ?? []).filter((f) => f.id !== fileId) }
-          : p
-      );
-      saveProjects(list);
-      const updated = list.find((p) => p.id === id);
-      if (updated) cloudSaveProject(updated);
-      return list;
-    });
+  // Best-effort delete of index passages by key (mcp-knowledge delete_documents).
+  const deleteIndexKeys = useCallback(async (keys: string[]): Promise<void> => {
+    if (keys.length === 0) return;
+    try {
+      await fetch("/api/tool", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tool: "delete_documents", args: { keys } }),
+      });
+    } catch {
+      /* index may not be configured; removal from the project still stands */
+    }
   }, []);
+
+  const removeProjectFile = useCallback(
+    (id: string, fileId: string) => {
+      // Compute the file's index keys before removal so we can also delete its
+      // passages from the search index (best-effort).
+      const proj = projectsRef.current.find((p) => p.id === id);
+      const file = proj?.files?.find((f) => f.id === fileId);
+      if (file) void deleteIndexKeys(fileIngestKeys(id, file));
+      setProjects((prev) => {
+        const list = prev.map((p) =>
+          p.id === id
+            ? { ...p, files: (p.files ?? []).filter((f) => f.id !== fileId) }
+            : p
+        );
+        saveProjects(list);
+        const updated = list.find((p) => p.id === id);
+        if (updated) cloudSaveProject(updated);
+        return list;
+      });
+    },
+    [deleteIndexKeys]
+  );
+
+  // Remove all of a project's passages from the index (Files panel action).
+  const removeProjectFromIndex = useCallback(
+    async (project: Project): Promise<string> => {
+      const keys = chunkProjectForIngest(project).map((d) => d.id);
+      if (keys.length === 0) return "No files to remove.";
+      const res = await fetch("/api/tool", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tool: "delete_documents", args: { keys } }),
+      });
+      const json = await res.json();
+      if (json.error) return `Remove failed: ${json.error}`;
+      return (
+        toolResultText(json.result) || `Removed ${keys.length} passage(s).`
+      );
+    },
+    []
+  );
 
   // Push a project's files into the Azure AI Search index (mcp-knowledge) so
   // they're retrievable via search_knowledge. Files are chunked into passages.
@@ -584,6 +631,12 @@ export default function Page() {
 
   const deleteProject = useCallback(
     (id: string) => {
+      // Also purge the project's passages from the search index (best-effort).
+      const proj = projectsRef.current.find((p) => p.id === id);
+      if (proj) {
+        const keys = chunkProjectForIngest(proj).map((d) => d.id);
+        void deleteIndexKeys(keys);
+      }
       setProjects((prev) => {
         const list = prev.filter((p) => p.id !== id);
         saveProjects(list);
@@ -603,7 +656,7 @@ export default function Page() {
         saveActiveProject(null);
       }
     },
-    [activeProjectId]
+    [activeProjectId, deleteIndexKeys]
   );
 
   const assignChatToProject = useCallback(
@@ -767,6 +820,7 @@ export default function Page() {
           onRemoveFile={removeProjectFile}
           onIngest={ingestProject}
           onCreateIndex={createProjectIndex}
+          onRemoveFromIndex={removeProjectFromIndex}
           fileMax={PROJECT_FILE_MAX}
         />
       )}

@@ -25,6 +25,7 @@ export default function ProjectsModal({
   onRemoveFile,
   onIngest,
   onCreateIndex,
+  onRemoveFromIndex,
   fileMax,
 }: {
   projects: Project[];
@@ -42,6 +43,7 @@ export default function ProjectsModal({
   onRemoveFile: (id: string, fileId: string) => void;
   onIngest: (project: Project) => Promise<string>;
   onCreateIndex: () => Promise<string>;
+  onRemoveFromIndex: (project: Project) => Promise<string>;
   fileMax: number;
 }) {
   const [name, setName] = useState("");
@@ -131,6 +133,22 @@ export default function ProjectsModal({
     setIngestMsg((m) => ({ ...m, [p.id]: "Creating index\u2026" }));
     try {
       const msg = await onCreateIndex();
+      setIngestMsg((m) => ({ ...m, [p.id]: msg }));
+    } catch (err) {
+      setIngestMsg((m) => ({
+        ...m,
+        [p.id]: err instanceof Error ? err.message : String(err),
+      }));
+    } finally {
+      setIngestId(null);
+    }
+  };
+
+  const removeFromIndex = async (p: Project) => {
+    setIngestId(p.id);
+    setIngestMsg((m) => ({ ...m, [p.id]: "Removing\u2026" }));
+    try {
+      const msg = await onRemoveFromIndex(p);
       setIngestMsg((m) => ({ ...m, [p.id]: msg }));
     } catch (err) {
       setIngestMsg((m) => ({
@@ -365,6 +383,17 @@ export default function ProjectsModal({
                             : "Ingest to knowledge base"}
                         </button>
                       )}
+                      {p.files && p.files.length > 0 && (
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          disabled={ingestId === p.id}
+                          onClick={() => removeFromIndex(p)}
+                          title="Delete this project's passages from the search index"
+                        >
+                          Remove from index
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="btn-primary"
@@ -407,15 +436,15 @@ export default function ProjectsModal({
             </div>
           ))}
         </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          hidden
+          accept=".txt,.md,.markdown,.json,.csv,.tsv,.ts,.tsx,.js,.jsx,.py,.yaml,.yml,.html,.css,.sql,.xml,.log,text/*"
+          onChange={(e) => onFilesChosen(e.target.files)}
+        />
       </div>
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        hidden
-        accept=".txt,.md,.markdown,.json,.csv,.tsv,.ts,.tsx,.js,.jsx,.py,.yaml,.yml,.html,.css,.sql,.xml,.log,text/*"
-        onChange={(e) => onFilesChosen(e.target.files)}
-      />
     </div>
   );
 }

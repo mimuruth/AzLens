@@ -100,3 +100,51 @@ test("creates and opens a project", async ({ page }) => {
     page.locator("button.project-nav", { hasText: "Demo Project" })
   ).toBeVisible();
 });
+
+test("creates the index and ingests project files (mocked tool API)", async ({
+  page,
+}) => {
+  // Stub the MCP tool proxy so the test needs no running knowledge server.
+  await page.route("**/api/tool", async (route) => {
+    const body = route.request().postDataJSON() as { tool: string };
+    const byTool: Record<string, string> = {
+      create_index: 'Created index "azlens".',
+      ingest_documents: 'Ingested 1 document(s) into "azlens".',
+      delete_documents: "Deleted 1/1 document(s).",
+    };
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        result: { content: [{ text: byTool[body.tool] ?? "ok" }] },
+      }),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Manage" }).click();
+  await page.getByPlaceholder("New project name…").fill("RAG Project");
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+
+  const item = page.locator(".project-item", { hasText: "RAG Project" });
+  await item.getByRole("button", { name: /Files/ }).click();
+
+  // Create index is always available (first-time setup).
+  await item.getByRole("button", { name: "Create index" }).click();
+  await expect(item.locator(".project-files-status")).toHaveText(
+    /Created index/
+  );
+
+  // Upload a file, then ingest it to the knowledge base.
+  const fileChooserPromise = page.waitForEvent("filechooser");
+  await item.getByRole("button", { name: "Add files" }).click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles({
+    name: "notes.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("Azure AI Search grounds answers with citations."),
+  });
+  await expect(item.locator(".project-file-name")).toHaveText("notes.md");
+  await item.getByRole("button", { name: "Ingest to knowledge base" }).click();
+  await expect(item.locator(".project-files-status")).toHaveText(/Ingested/);
+});

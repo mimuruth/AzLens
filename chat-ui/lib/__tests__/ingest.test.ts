@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   chunkProjectForIngest,
   toolResultText,
+  fileIngestKeys,
   INGEST_CHUNK_SIZE,
 } from "../ingest";
 
@@ -78,5 +79,25 @@ describe("toolResultText", () => {
     expect(toolResultText(null)).toBe("");
     expect(toolResultText({})).toBe("");
     expect(toolResultText({ content: "nope" })).toBe("");
+  });
+});
+
+describe("fileIngestKeys", () => {
+  it("matches the ids produced by chunkProjectForIngest", () => {
+    const proj = {
+      id: "proj1",
+      name: "P",
+      files: [{ id: "f1", name: "a.txt", size: 6, content: "abcdef" }],
+    };
+    const docIds = chunkProjectForIngest(proj, 3).map((d) => d.id);
+    const keys = fileIngestKeys("proj1", proj.files[0], 3);
+    expect(keys).toEqual(docIds);
+    expect(keys).toEqual(["proj1-f1-0", "proj1-f1-1"]);
+  });
+
+  it("returns a single key for a short file and none for empty content", () => {
+    expect(fileIngestKeys("p", { id: "f", content: "hi" })).toEqual(["p-f-0"]);
+    expect(fileIngestKeys("p", { id: "f", content: "" })).toEqual([]);
+    expect(fileIngestKeys("p", { id: "f" })).toEqual([]);
   });
 });
