@@ -929,26 +929,13 @@ code {
   gap: 8px;
 }
 
-/* ---- Composer footer: quick modes + inline model selector ---- */
-.composer-foot {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
+/* ---- Composer quick modes (below the box) + inline model selector ---- */
 .composer-modes {
+  max-width: var(--max-width);
+  margin: 10px auto 0;
   display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding-bottom: 1px;
-}
-
-.composer-modes::-webkit-scrollbar {
-  display: none;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .mode-chip {

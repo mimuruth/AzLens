@@ -960,6 +960,25 @@ export default function ChatArea({
               rows={1}
               autoFocus
             />
+            {providers.length > 0 && modelSelection && (
+              <select
+                className="composer-model"
+                value={`${modelSelection.provider}::${modelSelection.model}`}
+                onChange={(e) => {
+                  const [provider, model] = e.target.value.split("::");
+                  onSelectModel({ provider, model });
+                }}
+                title="Model for this message"
+              >
+                {providers.map((p) =>
+                  p.models.map((mm) => (
+                    <option key={`${p.id}::${mm}`} value={`${p.id}::${mm}`}>
+                      {p.label} · {mm}
+                    </option>
+                  ))
+                )}
+              </select>
+            )}
             {isBusy ? (
               <button
                 className="send stop"
@@ -999,43 +1018,6 @@ export default function ChatArea({
             )}
           </div>
 
-          <div className="composer-foot">
-            <div className="composer-modes">
-              {COMPOSER_MODES.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  className={`mode-chip ${mode === m.id ? "active" : ""}`}
-                  onClick={() => setMode(mode === m.id ? null : m.id)}
-                  aria-pressed={mode === m.id}
-                  title={m.label}
-                >
-                  <span className="mode-glyph">{m.glyph}</span>
-                  {m.label}
-                </button>
-              ))}
-            </div>
-            {providers.length > 0 && modelSelection && (
-              <select
-                className="composer-model"
-                value={`${modelSelection.provider}::${modelSelection.model}`}
-                onChange={(e) => {
-                  const [provider, model] = e.target.value.split("::");
-                  onSelectModel({ provider, model });
-                }}
-                title="Model for this message"
-              >
-                {providers.map((p) =>
-                  p.models.map((mm) => (
-                    <option key={`${p.id}::${mm}`} value={`${p.id}::${mm}`}>
-                      {p.label} · {mm}
-                    </option>
-                  ))
-                )}
-              </select>
-            )}
-          </div>
-
           <input
             ref={fileInputRef}
             type="file"
@@ -1045,6 +1027,21 @@ export default function ChatArea({
             accept="image/*,.pdf,.txt,.md,.json,.csv,.log"
           />
         </form>
+        <div className="composer-modes">
+          {COMPOSER_MODES.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className={`mode-chip ${mode === m.id ? "active" : ""}`}
+              onClick={() => setMode(mode === m.id ? null : m.id)}
+              aria-pressed={mode === m.id}
+              title={m.label}
+            >
+              <span className="mode-glyph">{m.glyph}</span>
+              {m.label}
+            </button>
+          ))}
+        </div>
         <p className="disclaimer">
           AzLens can use MCP tools to act on your behalf.
         </p>
