@@ -48,6 +48,14 @@ Collapsing the sidebar leaves a slim **icon rail** (new chat, search, theme):
 
 ![AzLens sidebar collapsed to a slim icon rail](docs/chat-ui-rail.png)
 
+**Projects** group related chats with shared instructions and grounding files (reorder by drag or arrows, ingest to the knowledge base):
+
+![AzLens Projects modal listing projects with reorder, instructions, files, and knowledge-base actions](docs/chat-ui-projects.png)
+
+The **Artifacts** panel collects the code, docs, and tables an assistant produces — with preview, copy-all, and zip download:
+
+![AzLens Artifacts panel showing a syntax-highlighted code artifact with copy and download actions](docs/chat-ui-artifacts.png)
+
 <details>
 <summary>Light mode</summary>
 
