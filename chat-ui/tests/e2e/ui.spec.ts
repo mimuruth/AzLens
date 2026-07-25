@@ -74,3 +74,11 @@ test("sidebar feature activates the matching composer mode", async ({
     /deep research/i
   );
 });
+
+test("opens the artifacts panel", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Artifacts" }).click();
+  await expect(page.getByText(/No artifacts yet/i)).toBeVisible();
+  await page.getByRole("button", { name: "Close artifacts" }).click();
+  await expect(page.getByText(/No artifacts yet/i)).toBeHidden();
+});

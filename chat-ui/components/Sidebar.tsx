@@ -115,9 +115,6 @@ const AGENT_GUIDE_PROMPT =
 const PROJECTS_PROMPT =
   "Let's start a project. Describe the goal and I'll help you plan the work, organize the files/steps, and keep track of progress.";
 
-const ARTIFACTS_PROMPT =
-  "List the artifacts (code, documents, tables) we've created in this conversation and help me refine or export them.";
-
 /** Left-menu feature shortcuts (Kimi-style). Clicking drafts a starter prompt
  * and, for the mode features, activates the matching composer mode chip. */
 const FEATURE_ITEMS: {
@@ -270,6 +267,7 @@ export default function Sidebar({
   onRemoveBookmark,
   onInsertTemplate,
   onRemoveTemplate,
+  onOpenArtifacts,
 }: {
   conversations: Conversation[];
   activeId: string;
@@ -291,6 +289,7 @@ export default function Sidebar({
   onRemoveBookmark: (id: string) => void;
   onInsertTemplate: (text: string) => void;
   onRemoveTemplate: (id: string) => void;
+  onOpenArtifacts: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -649,7 +648,7 @@ export default function Sidebar({
 
         <button
           className="side-entry"
-          onClick={() => onUseTool(ARTIFACTS_PROMPT)}
+          onClick={onOpenArtifacts}
           title="Artifacts"
         >
           <span className="side-entry-icon">

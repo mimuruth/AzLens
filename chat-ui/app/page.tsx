@@ -5,6 +5,7 @@ import type { UIMessage } from "ai";
 import Sidebar from "@/components/Sidebar";
 import ChatArea from "@/components/ChatArea";
 import CommandPalette from "@/components/CommandPalette";
+import ArtifactsPanel from "@/components/ArtifactsPanel";
 import {
   type Conversation,
   type Theme,
@@ -54,6 +55,7 @@ export default function Page() {
   const [modelSel, setModelSel] = useState<ModelSelection | null>(null);
   const [agentId, setAgentId] = useState<string>(DEFAULT_AGENT_ID);
   const [requireApproval, setRequireApproval] = useState(true);
+  const [artifactsOpen, setArtifactsOpen] = useState(false);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
   const [prefill, setPrefill] = useState<{
@@ -463,6 +465,7 @@ export default function Page() {
         onRemoveBookmark={removeBookmark}
         onInsertTemplate={useTool}
         onRemoveTemplate={removeTemplate}
+        onOpenArtifacts={() => setArtifactsOpen(true)}
       />
       <ChatArea
         key={activeId}
@@ -483,6 +486,12 @@ export default function Page() {
         onMessages={handleMessages}
         onToggleSidebar={() => setCollapsed((v) => !v)}
       />
+      {artifactsOpen && (
+        <ArtifactsPanel
+          conversationId={activeId}
+          onClose={() => setArtifactsOpen(false)}
+        />
+      )}
       {paletteOpen && (
         <CommandPalette
           conversations={conversations}
