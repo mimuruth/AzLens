@@ -1,16 +1,6 @@
-```html
 <div align="center">
-  <pre>
-   █████╗ ███████╗██╗     ███████╗███╗   ██╗███████╗
-  ██╔══██╗╚══███╔╝██║     ██╔════╝████╗  ██║██╔════╝
-  ███████║  ███╔╝ ██║     █████╗  ██╔██╗ ██║███████╗
-  ██╔══██║ ███╔╝  ██║     ██╔══╝  ██║╚██╗██║╚════██║
-  ██║  ██║███████╗███████╗███████╗██║ ╚████║███████║
-  ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═══╝╚══════╝
-              The context compression layer for AI agents
-</pre>
+  <img src="docs/banner.png" alt="AzLens — the context layer for AI agents" width="900" />
 </div>
-```
 
 # MCP Multi-Server Workspace
 

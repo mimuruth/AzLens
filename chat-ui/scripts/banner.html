@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #17181c;
+        --ink: #e6edf3;
+        --muted: #aab2c0;
+        --cyan: #5cb8d6;
+        --magenta: #c77dd6;
+        --green: #7ee787;
+        --frame: #c9d1d9;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; }
+      body {
+        background: #0b0c0e;
+        font-family: "Press Start 2P", ui-monospace, monospace;
+      }
+      .banner {
+        position: relative;
+        width: 1200px;
+        height: 320px;
+        background:
+          radial-gradient(600px 300px at 78% 40%, #1d1f26 0%, transparent 70%),
+          var(--bg);
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        padding: 44px 56px;
+      }
+      /* corner frame brackets */
+      .corner {
+        position: absolute;
+        width: 46px;
+        height: 46px;
+        border: 2px solid var(--frame);
+      }
+      .corner.tl { top: 18px; left: 18px; border-right: 0; border-bottom: 0; }
+      .corner.tr { top: 18px; right: 18px; border-left: 0; border-bottom: 0; }
+      .corner.bl { bottom: 18px; left: 18px; border-right: 0; border-top: 0; }
+      .corner.br { bottom: 18px; right: 18px; border-left: 0; border-top: 0; }
+
+      .left { display: flex; flex-direction: column; gap: 22px; z-index: 2; }
+      .welcome {
+        font-size: 15px;
+        color: var(--muted);
+        letter-spacing: 1px;
+      }
+      .wordmark {
+        font-size: 66px;
+        line-height: 1;
+        color: var(--cyan);
+        text-shadow: 4px 4px 0 var(--ink);
+        letter-spacing: 2px;
+      }
+      .tagline {
+        font-size: 14px;
+        color: var(--muted);
+        letter-spacing: 1px;
+      }
+
+      .mascot {
+        position: absolute;
+        right: 70px;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 2;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="banner" id="banner">
+      <span class="corner tl"></span>
+      <span class="corner tr"></span>
+      <span class="corner bl"></span>
+      <span class="corner br"></span>
+
+      <div class="left">
+        <div class="welcome">Welcome to</div>
+        <div class="wordmark">AZLENS</div>
+        <div class="tagline">The context layer for AI agents</div>
+      </div>
+
+      <!-- Pixel "lens-bot": blue head, magenta pods, dark visor, green eyes -->
+      <svg class="mascot" width="230" height="210" viewBox="0 0 230 210" shape-rendering="crispEdges">
+        <!-- antenna -->
+        <rect x="108" y="8" width="14" height="18" fill="#5cb8d6" />
+        <rect x="101" y="0" width="28" height="12" fill="#c77dd6" />
+        <!-- side pods -->
+        <rect x="10" y="86" width="34" height="70" rx="6" fill="#c77dd6" />
+        <rect x="186" y="86" width="34" height="70" rx="6" fill="#c77dd6" />
+        <!-- head -->
+        <rect x="34" y="26" width="162" height="150" rx="16" fill="#5cb8d6" />
+        <!-- visor -->
+        <rect x="50" y="52" width="130" height="98" rx="12" fill="#14151a" />
+        <!-- brow bar cut -->
+        <rect x="50" y="96" width="130" height="8" fill="#5cb8d6" />
+        <rect x="108" y="86" width="14" height="20" fill="#5cb8d6" />
+        <!-- eyes -->
+        <rect x="70" y="66" width="24" height="22" rx="4" fill="#14151a" stroke="#5cb8d6" stroke-width="6" />
+        <rect x="136" y="66" width="24" height="22" rx="4" fill="#14151a" stroke="#5cb8d6" stroke-width="6" />
+        <!-- mouth -->
+        <rect x="96" y="118" width="12" height="20" fill="#7ee787" />
+        <rect x="122" y="118" width="12" height="20" fill="#7ee787" />
+        <!-- feet -->
+        <rect x="66" y="176" width="30" height="16" rx="4" fill="#c77dd6" />
+        <rect x="134" y="176" width="30" height="16" rx="4" fill="#c77dd6" />
+      </svg>
+    </div>
+  </body>
+</html>
