@@ -112,6 +112,12 @@ const SERVER_TOOLS: Record<string, { name: string; example: string }[]> = {
 const AGENT_GUIDE_PROMPT =
   "Give me a guide to the available AI agents (General, Code Assistant, Azure Expert, Personal Assistant, GitHub, FinOps, Research, Data Analyst): what each one is best for, and which MCP tools it can use.";
 
+const PROJECTS_PROMPT =
+  "Let's start a project. Describe the goal and I'll help you plan the work, organize the files/steps, and keep track of progress.";
+
+const ARTIFACTS_PROMPT =
+  "List the artifacts (code, documents, tables) we've created in this conversation and help me refine or export them.";
+
 /** Left-menu feature shortcuts (Kimi-style). Clicking drafts a starter prompt
  * and, for the mode features, activates the matching composer mode chip. */
 const FEATURE_ITEMS: {
@@ -621,6 +627,49 @@ export default function Sidebar({
             />
           </svg>
           New chat
+        </button>
+
+        <button
+          className="side-entry"
+          onClick={() => onUseTool(PROJECTS_PROMPT)}
+          title="Projects"
+        >
+          <span className="side-entry-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+          Projects
+        </button>
+
+        <button
+          className="side-entry"
+          onClick={() => onUseTool(ARTIFACTS_PROMPT)}
+          title="Artifacts"
+        >
+          <span className="side-entry-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 3l9 5-9 5-9-5 9-5z"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M3 13l9 5 9-5"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+          Artifacts
         </button>
 
         <button
