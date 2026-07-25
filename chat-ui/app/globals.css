@@ -2056,6 +2056,87 @@ code {
   gap: 8px;
 }
 
+/* ---- Sidebar projects panel (drag chats onto a project) ---- */
+.projects-head-row {
+  display: flex;
+  align-items: center;
+}
+
+.projects-toggle {
+  flex: 1;
+}
+
+.projects-manage {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  padding: 8px 10px;
+}
+
+.projects-manage:hover {
+  color: var(--accent);
+}
+
+.project-nav {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+
+.project-nav:hover {
+  background: var(--hover);
+}
+
+.project-nav.active {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+.project-nav-icon {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.project-nav.active .project-nav-icon {
+  color: var(--accent);
+}
+
+.project-nav-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Highlight a project row while a chat is dragged over it. */
+.project-nav[data-dragover="true"],
+.project-nav:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.chat-item {
+  cursor: grab;
+}
+
 /* ---- Active-project banner in the sidebar ---- */
 .project-banner {
   display: flex;

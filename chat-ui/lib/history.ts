@@ -46,8 +46,9 @@ export async function listConversations(
   const { resources } = await container.items
     .query<ConversationMeta>({
       query:
-        "SELECT c.id, c.title, c.updatedAt, c.renamed, c.pinned, c.agentId, c.model " +
-        "FROM c WHERE c.userId = @u ORDER BY c.updatedAt DESC",
+        "SELECT c.id, c.title, c.updatedAt, c.renamed, c.pinned, c.agentId, c.model, c.projectId " +
+        "FROM c WHERE c.userId = @u AND (NOT IS_DEFINED(c.docType) OR c.docType != 'project') " +
+        "ORDER BY c.updatedAt DESC",
       parameters: [{ name: "@u", value: userId }],
     })
     .fetchAll();
@@ -90,6 +91,53 @@ export async function deleteConversation(
   userId: string,
   id: string
 ): Promise<void> {
+  const container = await getContainer();
+  if (!container) return;
+  try {
+    await container.item(id, userId).delete();
+  } catch {
+    /* already gone */
+  }
+}
+
+// ---- Projects (stored in the same container, tagged docType='project') ------
+
+export type StoredProject = {
+  id: string;
+  userId: string;
+  docType: "project";
+  name: string;
+  instructions?: string;
+  createdAt: number;
+};
+
+export type ProjectMeta = Omit<StoredProject, "userId" | "docType">;
+
+export async function listProjects(userId: string): Promise<ProjectMeta[]> {
+  const container = await getContainer();
+  if (!container) return [];
+  const { resources } = await container.items
+    .query<ProjectMeta>({
+      query:
+        "SELECT c.id, c.name, c.instructions, c.createdAt " +
+        "FROM c WHERE c.userId = @u AND c.docType = 'project' ORDER BY c.createdAt DESC",
+      parameters: [{ name: "@u", value: userId }],
+    })
+    .fetchAll();
+  return resources;
+}
+
+export async function upsertProject(
+  userId: string,
+  project: ProjectMeta
+): Promise<void> {
+  const container = await getContainer();
+  if (!container) return;
+  const doc: StoredProject = { ...project, userId, docType: "project" };
+  await container.items.upsert(doc);
+}
+
+export async function deleteProject(userId: string, id: string): Promise<void> {
   const container = await getContainer();
   if (!container) return;
   try {

@@ -1,5 +1,5 @@
 import type { UIMessage } from "ai";
-import type { Conversation } from "./storage";
+import type { Conversation, Project } from "./storage";
 
 /**
  * Client-side bridge to the server's Cosmos-backed history API. When the server
@@ -77,6 +77,42 @@ export function cloudSave(
 export function cloudDelete(id: string): void {
   if (!cloudEnabled()) return;
   fetch(`/api/history?id=${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  }).catch(() => {});
+}
+
+/** Fetch stored projects from the cloud (empty when disabled). */
+export async function cloudProjects(): Promise<Project[]> {
+  if (!cloudEnabled()) return [];
+  try {
+    const res = await fetch("/api/projects", { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { projects?: Project[] };
+    return data.projects ?? [];
+  } catch {
+    return [];
+  }
+}
+
+const projectTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+
+/** Debounced write-through of a project to the cloud. */
+export function cloudSaveProject(project: Project): void {
+  if (!cloudEnabled()) return;
+  clearTimeout(projectTimers[project.id]);
+  projectTimers[project.id] = setTimeout(() => {
+    fetch("/api/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project }),
+    }).catch(() => {});
+  }, 800);
+}
+
+/** Delete a project from the cloud. */
+export function cloudDeleteProject(id: string): void {
+  if (!cloudEnabled()) return;
+  fetch(`/api/projects?id=${encodeURIComponent(id)}`, {
     method: "DELETE",
   }).catch(() => {});
 }

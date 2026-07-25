@@ -85,7 +85,7 @@ test("opens the artifacts panel", async ({ page }) => {
 
 test("creates and opens a project", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Projects" }).click();
+  await page.getByRole("button", { name: "Manage" }).click();
   await expect(page.getByRole("dialog", { name: "Projects" })).toBeVisible();
   await page.getByPlaceholder("New project name…").fill("Demo Project");
   await page.getByRole("button", { name: "Create", exact: true }).click();
@@ -95,4 +95,8 @@ test("creates and opens a project", async ({ page }) => {
   await expect(openBtn).toBeVisible();
   await openBtn.click();
   await expect(page.locator(".project-banner-name")).toHaveText("Demo Project");
+  // It also appears as a drop target in the sidebar projects panel.
+  await expect(
+    page.locator("button.project-nav", { hasText: "Demo Project" })
+  ).toBeVisible();
 });

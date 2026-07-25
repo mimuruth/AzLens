@@ -43,7 +43,15 @@ import {
   newId,
 } from "@/lib/storage";
 import { DEFAULT_AGENT_ID } from "@/lib/agents";
-import { cloudInit, cloudMessages, cloudSave, cloudDelete } from "@/lib/cloud";
+import {
+  cloudInit,
+  cloudMessages,
+  cloudSave,
+  cloudDelete,
+  cloudProjects,
+  cloudSaveProject,
+  cloudDeleteProject,
+} from "@/lib/cloud";
 import {
   downloadFile,
   exportChatMarkdown,
@@ -108,6 +116,14 @@ export default function Page() {
           saveConversations(list);
           active = list[0].id;
           saveActive(active);
+        }
+        // Hydrate projects from the cloud on a fresh device.
+        if (cloud.enabled && loadProjects().length === 0) {
+          const cp = await cloudProjects();
+          if (cp.length > 0) {
+            saveProjects(cp);
+            setProjects(cp);
+          }
         }
       } catch {
         /* offline or disabled — fall back to local storage */
@@ -429,17 +445,21 @@ export default function Page() {
   }, []);
 
   const createProject = useCallback((name: string) => {
+    const project = { id: newId(), name, createdAt: Date.now() };
     setProjects((prev) => {
-      const list = [{ id: newId(), name, createdAt: Date.now() }, ...prev];
+      const list = [project, ...prev];
       saveProjects(list);
       return list;
     });
+    cloudSaveProject(project);
   }, []);
 
   const renameProject = useCallback((id: string, name: string) => {
     setProjects((prev) => {
       const list = prev.map((p) => (p.id === id ? { ...p, name } : p));
       saveProjects(list);
+      const updated = list.find((p) => p.id === id);
+      if (updated) cloudSaveProject(updated);
       return list;
     });
   }, []);
@@ -450,6 +470,8 @@ export default function Page() {
         p.id === id ? { ...p, instructions: text } : p
       );
       saveProjects(list);
+      const updated = list.find((p) => p.id === id);
+      if (updated) cloudSaveProject(updated);
       return list;
     });
   }, []);
@@ -461,6 +483,7 @@ export default function Page() {
         saveProjects(list);
         return list;
       });
+      cloudDeleteProject(id);
       // Un-group the project's chats rather than deleting them.
       setConversations((prev) => {
         const list = prev.map((c) =>
@@ -475,6 +498,21 @@ export default function Page() {
       }
     },
     [activeProjectId]
+  );
+
+  const assignChatToProject = useCallback(
+    (chatId: string, projectId: string | null) => {
+      setConversations((prev) => {
+        const list = prev.map((c) =>
+          c.id === chatId ? { ...c, projectId: projectId ?? undefined } : c
+        );
+        saveConversations(list);
+        const updated = list.find((c) => c.id === chatId);
+        if (updated) cloudSave(updated, loadMessages(chatId));
+        return list;
+      });
+    },
+    []
   );
 
   const selectProject = useCallback((id: string | null) => {
@@ -575,8 +613,10 @@ export default function Page() {
         onRemoveTemplate={removeTemplate}
         onOpenArtifacts={() => setArtifactsOpen(true)}
         onOpenProjects={() => setProjectsOpen(true)}
-        activeProjectName={activeProject?.name ?? null}
-        onExitProject={() => selectProject(null)}
+        projects={projects}
+        activeProjectId={activeProjectId}
+        onSelectProject={selectProject}
+        onAssignChatToProject={assignChatToProject}
       />
       <ChatArea
         key={activeId}

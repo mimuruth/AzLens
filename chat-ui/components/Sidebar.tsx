@@ -6,6 +6,7 @@ import {
   type Theme,
   type Bookmark,
   type PromptTemplate,
+  type Project,
   groupByDate,
 } from "@/lib/storage";
 import Logo from "@/components/Logo";
@@ -266,8 +267,10 @@ export default function Sidebar({
   onRemoveTemplate,
   onOpenArtifacts,
   onOpenProjects,
-  activeProjectName,
-  onExitProject,
+  projects,
+  activeProjectId,
+  onSelectProject,
+  onAssignChatToProject,
 }: {
   conversations: Conversation[];
   activeId: string;
@@ -291,8 +294,10 @@ export default function Sidebar({
   onRemoveTemplate: (id: string) => void;
   onOpenArtifacts: () => void;
   onOpenProjects: () => void;
-  activeProjectName: string | null;
-  onExitProject: () => void;
+  projects: Project[];
+  activeProjectId: string | null;
+  onSelectProject: (id: string | null) => void;
+  onAssignChatToProject: (chatId: string, projectId: string | null) => void;
 }) {
   const [query, setQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -303,6 +308,10 @@ export default function Sidebar({
   const [libOpen, setLibOpen] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
   const [featuresOpen, setFeaturesOpen] = useState(true);
+  const [projectsPanelOpen, setProjectsPanelOpen] = useState(true);
+  const activeProjectName = activeProjectId
+    ? (projects.find((p) => p.id === activeProjectId)?.name ?? null)
+    : null;
   const [library, setLibrary] = useState<{
     prompts: LibraryPrompt[];
     resources: LibraryResource[];
@@ -423,6 +432,8 @@ export default function Sidebar({
         className={`chat-item ${c.id === activeId ? "active" : ""}`}
         onClick={() => onSelect(c.id)}
         onDoubleClick={() => startRename(c)}
+        draggable
+        onDragStart={(e) => e.dataTransfer.setData("text/plain", c.id)}
       >
         {editingId === c.id ? (
           <input
@@ -631,23 +642,83 @@ export default function Sidebar({
           New chat
         </button>
 
-        <button
-          className="side-entry"
-          onClick={onOpenProjects}
-          title="Projects"
-        >
-          <span className="side-entry-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </span>
-          Projects
-        </button>
+        <div className="tools-panel projects-panel">
+          <div className="projects-head-row">
+            <button
+              className="tools-head projects-toggle"
+              onClick={() => setProjectsPanelOpen((v) => !v)}
+              aria-expanded={projectsPanelOpen}
+            >
+              <span>Projects</span>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                className={projectsPanelOpen ? "chev open" : "chev"}
+              >
+                <path
+                  d="M6 9l6 6 6-6"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="projects-manage"
+              onClick={onOpenProjects}
+              title="Manage projects"
+            >
+              Manage
+            </button>
+          </div>
+          {projectsPanelOpen && (
+            <div className="tools-list">
+              <button
+                type="button"
+                className={`project-nav ${activeProjectId === null ? "active" : ""}`}
+                onClick={() => onSelectProject(null)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  const id = e.dataTransfer.getData("text/plain");
+                  if (id) onAssignChatToProject(id, null);
+                }}
+              >
+                <span className="project-nav-icon">☰</span>
+                <span className="project-nav-name">All chats</span>
+              </button>
+              {projects.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`project-nav ${activeProjectId === p.id ? "active" : ""}`}
+                  onClick={() => onSelectProject(p.id)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    const id = e.dataTransfer.getData("text/plain");
+                    if (id) onAssignChatToProject(id, p.id);
+                  }}
+                  title={`${p.name} — drop a chat here to add it`}
+                >
+                  <span className="project-nav-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                  <span className="project-nav-name">{p.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <button
           className="side-entry"
@@ -779,7 +850,7 @@ export default function Sidebar({
             <button
               type="button"
               className="project-banner-exit"
-              onClick={onExitProject}
+              onClick={() => onSelectProject(null)}
               title="Exit project"
               aria-label="Exit project"
             >
