@@ -14,7 +14,7 @@
 
 # MCP Multi-Server Workspace
 
-**AzLens** is a TypeScript monorepo of three decoupled [Model Context Protocol](https://modelcontextprotocol.io) servers plus a ChatGPT-style web UI, deployable end-to-end to **Azure Container Apps** with a single GitHub Actions workflow.
+**AzLens** is a TypeScript monorepo of seven decoupled [Model Context Protocol](https://modelcontextprotocol.io) servers plus a ChatGPT-style web UI, deployable end-to-end to **Azure Container Apps** with a single GitHub Actions workflow.
 
 | Component                | Type        | Purpose                            | Tools / Role                                                                                                                                                               |
 | ------------------------ | ----------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -23,7 +23,7 @@
 | `mcp-personal-assistant` | MCP server  | Notes + to-do lists                | `get_daily_notes`, `update_todo_list`                                                                                                                                      |
 | `mcp-github`             | MCP server  | GitHub repos / issues / PRs / code | `search_repositories`, `get_repository`, `list_issues`, `get_issue`, `list_pull_requests`, `get_file_contents`, `create_issue`, `add_issue_comment`, `create_pull_request` |
 | `mcp-azure-cost`         | MCP server  | Azure cost analysis (FinOps)       | `query_cost`, `get_cost_forecast`, `list_budgets`                                                                                                                          |
-| `mcp-knowledge`          | MCP server  | RAG over Azure AI Search           | `search_knowledge`, `get_document`                                                                                                                                         |
+| `mcp-knowledge`          | MCP server  | RAG over Azure AI Search           | `search_knowledge`, `get_document`, `ingest_documents`, `create_index`, `delete_documents`                                                                                 |
 | `mcp-postgres`           | MCP server  | Read-only PostgreSQL queries       | `list_tables`, `describe_table`, `query`                                                                                                                                   |
 | `chat-ui`                | Next.js app | ChatGPT-style front end            | Multi-provider LLM + MCP client over all seven servers                                                                                                                     |
 
@@ -36,7 +36,7 @@ Each MCP server ships **two transports** from a single codebase:
 
 A modern, claude.ai-style front end with a collapsible sidebar, **New chat**, search, and multiple conversations you can switch between (persisted in the browser, with optional server-side sync to Azure Cosmos DB). Each conversation streams responses from your chosen model and can call the MCP tools.
 
-Highlights: **multi-provider models** (Azure OpenAI / OpenAI / Anthropic / local LM Studio-style servers) — cloud model lists are **auto-discovered** from each provider's `/models` API (with a curated fallback) — plus an **Auto router** that sends simple prompts to a cheap model and complex ones to a powerful model; a per-turn **usage & cost** footer (prices overridable via `PRICES_JSON`); switchable **agents** (General / Code / Azure / Personal Assistant / GitHub / FinOps / Research / Data), each scoped to the right MCP servers; **per-conversation instructions** that refine the agent prompt; **syntax-highlighted code blocks** with a copy button; **tool approval** for mutating tools (including GitHub `create_issue` / `create_pull_request`); **stop / regenerate / copy / edit-and-resend**; **dark mode**; an **MCP tools health panel** (live online/offline dots); chat **rename** + date grouping; markdown rendering; file/image attachments; and a **⌘K command palette**.
+Highlights: **multi-provider models** (Azure OpenAI / OpenAI / Anthropic / local LM Studio-style servers) — cloud model lists are **auto-discovered** from each provider's `/models` API (with a curated fallback) — plus an **Auto router** that sends simple prompts to a cheap model and complex ones to a powerful model; a per-turn **usage & cost** footer (prices overridable via `PRICES_JSON`); switchable **agents** (General / Code / Azure / Personal Assistant / GitHub / FinOps / Research / Data), each scoped to the right MCP servers; **Projects** that group related chats with shared instructions and uploaded grounding files; an **Artifacts** panel that collects the code, docs, and tables an assistant produces (with preview, copy-all, and zip download); **per-conversation instructions** that refine the agent prompt; **syntax-highlighted code blocks** with a copy button; **tool approval** for mutating tools (including GitHub `create_issue` / `create_pull_request` and knowledge-base `ingest_documents`); **stop / regenerate / copy / edit-and-resend**; **dark mode**; an **MCP tools health panel** (live online/offline dots); chat **rename** + date grouping; markdown rendering; file/image attachments; and a **⌘K command palette**.
 
 ![AzLens chat UI in dark mode: sidebar with a pinned chat and date-grouped chats, an MCP tools health panel, a model picker in the top bar, and a conversation with rendered markdown](docs/chat-ui-hero.png)
 
@@ -234,7 +234,7 @@ npm run smoke
 
 Expected: `Smoke test PASSED.` (all checks pass). Use `SKIP_BUILD=1 npm run smoke` to skip rebuilds.
 
-The chat-ui also has **Vitest** unit tests for the complexity router, cost estimator, and tool-approval gating:
+The chat-ui also has **Vitest** unit tests for the complexity router, cost estimator, tool-approval gating, and the knowledge-base ingestion chunking:
 
 ```bash
 cd chat-ui
@@ -243,7 +243,7 @@ npm install && npm test
 
 These run automatically in CI alongside each project's build.
 
-The chat-ui also ships **Playwright** end-to-end tests for UI flows that need no model key (greeting, new chat, command palette, per-conversation instructions):
+The chat-ui also ships **Playwright** end-to-end tests for UI flows that need no model key — greeting, new chat, command palette, per-conversation instructions, composer mode chips, the Artifacts panel, creating/opening a Project, and knowledge-base ingestion (with a mocked tool API):
 
 ```bash
 cd chat-ui
@@ -359,15 +359,16 @@ Auth uses `DefaultAzureCredential` (`az login` locally, managed identity in Azur
 
 ### `mcp-knowledge`
 
-| Variable                       | Default   | Description                                                                                      |
-| ------------------------------ | --------- | ------------------------------------------------------------------------------------------------ |
-| `AZURE_SEARCH_ENDPOINT`        | —         | Azure AI Search service endpoint, e.g. `https://<svc>.search.windows.net`.                       |
-| `AZURE_SEARCH_INDEX`           | —         | Index name to query.                                                                             |
-| `AZURE_SEARCH_API_KEY`         | —         | Optional query key; leave empty to use the managed identity (**Search Index Data Reader** role). |
-| `AZURE_SEARCH_CONTENT_FIELD`   | `content` | Field holding the passage text.                                                                  |
-| `AZURE_SEARCH_TITLE_FIELD`     | `title`   | Field holding the document title.                                                                |
-| `AZURE_SEARCH_SEMANTIC_CONFIG` | —         | Optional semantic configuration name to enable semantic ranking.                                 |
-| `PORT`                         | `3000`    | HTTP port                                                                                        |
+| Variable                       | Default   | Description                                                                                                                                                                                                                           |
+| ------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AZURE_SEARCH_ENDPOINT`        | —         | Azure AI Search service endpoint, e.g. `https://<svc>.search.windows.net`.                                                                                                                                                            |
+| `AZURE_SEARCH_INDEX`           | —         | Index name to query.                                                                                                                                                                                                                  |
+| `AZURE_SEARCH_API_KEY`         | —         | Optional key; leave empty to use the managed identity. Reading needs **Search Index Data Reader**; ingesting/deleting needs **Search Index Data Contributor**; `create_index` needs **Search Service Contributor** (or an admin key). |
+| `AZURE_SEARCH_KEY_FIELD`       | `id`      | Field holding the document key (used by ingest/delete).                                                                                                                                                                               |
+| `AZURE_SEARCH_CONTENT_FIELD`   | `content` | Field holding the passage text.                                                                                                                                                                                                       |
+| `AZURE_SEARCH_TITLE_FIELD`     | `title`   | Field holding the document title.                                                                                                                                                                                                     |
+| `AZURE_SEARCH_SEMANTIC_CONFIG` | —         | Optional semantic configuration name to enable semantic ranking.                                                                                                                                                                      |
+| `PORT`                         | `3000`    | HTTP port                                                                                                                                                                                                                             |
 
 ### `mcp-postgres`
 
@@ -576,6 +577,9 @@ Then re-run `az deployment group create` passing the `*Image` parameters (see th
 | mcp-azure-cost         | `list_budgets`         | —                                                           | Budgets with limit, period, and current spend                                     |
 | mcp-knowledge          | `search_knowledge`     | `query`, `top?`                                             | Semantic/keyword search over an Azure AI Search index (cited passages)            |
 | mcp-knowledge          | `get_document`         | `key`                                                       | Fetch one document from the index by key                                          |
+| mcp-knowledge          | `ingest_documents`     | `documents[]`                                               | Merge-or-upload documents (id, title, content, source) into the index             |
+| mcp-knowledge          | `create_index`         | `force?`                                                    | Create the search index with a default schema (first-time setup)                  |
+| mcp-knowledge          | `delete_documents`     | `keys[]`                                                    | Delete documents from the index by key                                            |
 | mcp-postgres           | `list_tables`          | `schema?`                                                   | List tables/views in a schema                                                     |
 | mcp-postgres           | `describe_table`       | `table`, `schema?`                                          | Columns and types of a table                                                      |
 | mcp-postgres           | `query`                | `sql`, `limit?`                                             | Run a read-only SELECT/WITH query (READ ONLY txn + timeout)                       |
@@ -614,6 +618,20 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 - Delete individual chats or **Clear all chats**.
 - **Export** a chat to Markdown or all chats to JSON, and **Import** chats back — from the command palette.
 
+**Projects (chat grouping + grounding)**
+
+- Group related chats into **Projects** (claude.ai-style) from the sidebar **Projects** panel or the **Manage** modal. Assign a chat by **dragging** it onto a project; opening a project filters the sidebar to its chats.
+- **Shared instructions** per project are prepended to every chat in it; chats that inherit them show a small indicator next to their title.
+- **Reorder** projects by drag-and-drop or the ↑/↓ buttons (order persists locally and to Cosmos).
+- **Grounding files** — upload text files to a project; their contents are injected as reference context into every chat in that project.
+- **Knowledge-base ingestion** — one-click **Create index**, **Ingest to knowledge base** (chunks the project's files into passages and merges them into Azure AI Search via `mcp-knowledge`), and **Remove from index**. Removing a file or deleting a project also purges its passages from the index.
+
+**Artifacts**
+
+- A right-side **Artifacts** panel collects the code, documents, and tables the assistant produced in the active chat, updating live as messages stream in.
+- **Syntax-highlighted** code (highlight.js), a **Preview** toggle for HTML (sandboxed iframe), SVG, Markdown, and a collapsible **JSON tree**.
+- **Copy** or **Download** any artifact, **Copy all**, or **Download all** as a zip.
+
 **Composing & responses**
 
 - Streaming responses rendered as **Markdown** (headings, lists, tables, code blocks, links) via `react-markdown` + GFM.
@@ -631,7 +649,7 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 
 **Tool approval (human-in-the-loop)**
 
-- The **Approvals** toggle in the top bar (on by default) requires explicit confirmation before **mutating** tools run (`write_file`, `update_todo_list`). When the model calls one, its `execute` is withheld server-side and the UI shows **Approve / Deny**; approving runs it via `POST /api/tool` and the model continues. Turn it off to let tools run automatically. Configure the sensitive-tool list in [chat-ui/lib/tools.ts](chat-ui/lib/tools.ts).
+- The **Approvals** toggle in the top bar (on by default) requires explicit confirmation before **mutating** tools run — `write_file`, `update_todo_list`, the GitHub writers (`create_issue`, `add_issue_comment`, `create_pull_request`), and the knowledge-base writers (`ingest_documents`, `create_index`, `delete_documents`). When the model calls one, its `execute` is withheld server-side and the UI shows **Approve / Deny**; approving runs it via `POST /api/tool` and the model continues. Turn it off to let tools run automatically. Configure the sensitive-tool list in [chat-ui/lib/tools.ts](chat-ui/lib/tools.ts).
 
 **Agents**
 
@@ -640,6 +658,10 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
   - **Code Assistant** — `mcp-local-coder` only (read/write/search code).
   - **Azure Expert** — `AzLens-mcp` only (resource queries, KQL, docs).
   - **Personal Assistant** — `mcp-personal-assistant` only (notes & to-dos).
+  - **GitHub** — `mcp-github` only (repos, issues, PRs, file contents).
+  - **FinOps** — `mcp-azure-cost` only (spend, forecasts, budgets).
+  - **Research** — `mcp-knowledge` only (grounded answers with citations).
+  - **Data Analyst** — `mcp-postgres` only (read-only SQL over your database).
 - Add or edit agents in [chat-ui/lib/agents.ts](chat-ui/lib/agents.ts).
 
 **MCP tools panel**
@@ -651,7 +673,8 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 
 - **⌘K / Ctrl+K command palette** — jump to any chat or run actions (new chat, toggle theme, export/import).
 - **Dark mode** toggle (persisted).
-- Collapsible sidebar that becomes a slim **icon rail**.
+- Collapsible sidebar that becomes a slim **icon rail**, with entries for **Projects** and **Artifacts** and a collapsible **Features** group.
+- **Composer mode chips** below the input (Swarm / Slide / Deep Research / Websites / Docs / Sheets) and an inline model selector next to Send.
 - **Search** to filter conversations.
 
 **API routes (Next.js route handlers)**
