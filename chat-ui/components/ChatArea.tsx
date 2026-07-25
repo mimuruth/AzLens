@@ -186,6 +186,16 @@ function MessageMarkdown({ text }: { text: string }) {
   );
 }
 
+/** Quick composer modes (Kimi-style). Each prepends a behaviour hint server-side. */
+const COMPOSER_MODES: { id: string; label: string; glyph: string }[] = [
+  { id: "swarm", label: "Swarm", glyph: "✦" },
+  { id: "slide", label: "Slide", glyph: "▭" },
+  { id: "deep-research", label: "Deep Research", glyph: "◈" },
+  { id: "websites", label: "Websites", glyph: "◍" },
+  { id: "docs", label: "Docs", glyph: "▤" },
+  { id: "sheets", label: "Sheets", glyph: "▦" },
+];
+
 export default function ChatArea({
   id,
   providers,
@@ -231,6 +241,7 @@ export default function ChatArea({
   approvalRef.current = requireApproval;
   const instructionsRef = useRef(instructions);
   instructionsRef.current = instructions;
+  const modeRef = useRef<string | null>(null);
 
   const {
     messages,
@@ -257,6 +268,7 @@ export default function ChatArea({
       ...(instructionsRef.current
         ? { instructions: instructionsRef.current }
         : {}),
+      ...(modeRef.current ? { mode: modeRef.current } : {}),
       ...(modelRef.current
         ? { provider: modelRef.current.provider, model: modelRef.current.model }
         : {}),
@@ -273,6 +285,8 @@ export default function ChatArea({
   const [editText, setEditText] = useState("");
   const [instrOpen, setInstrOpen] = useState(false);
   const [instrDraft, setInstrDraft] = useState(instructions);
+  const [mode, setMode] = useState<string | null>(null);
+  modeRef.current = mode;
   const [tplOpen, setTplOpen] = useState(false);
 
   const canSend = input.trim().length > 0 || attachments.length > 0;
@@ -982,6 +996,43 @@ export default function ChatArea({
                   />
                 </svg>
               </button>
+            )}
+          </div>
+
+          <div className="composer-foot">
+            <div className="composer-modes">
+              {COMPOSER_MODES.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  className={`mode-chip ${mode === m.id ? "active" : ""}`}
+                  onClick={() => setMode(mode === m.id ? null : m.id)}
+                  aria-pressed={mode === m.id}
+                  title={m.label}
+                >
+                  <span className="mode-glyph">{m.glyph}</span>
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            {providers.length > 0 && modelSelection && (
+              <select
+                className="composer-model"
+                value={`${modelSelection.provider}::${modelSelection.model}`}
+                onChange={(e) => {
+                  const [provider, model] = e.target.value.split("::");
+                  onSelectModel({ provider, model });
+                }}
+                title="Model for this message"
+              >
+                {providers.map((p) =>
+                  p.models.map((mm) => (
+                    <option key={`${p.id}::${mm}`} value={`${p.id}::${mm}`}>
+                      {p.label} · {mm}
+                    </option>
+                  ))
+                )}
+              </select>
             )}
           </div>
 

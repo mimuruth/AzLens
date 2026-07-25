@@ -929,6 +929,92 @@ code {
   gap: 8px;
 }
 
+/* ---- Composer footer: quick modes + inline model selector ---- */
+.composer-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.composer-modes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 1px;
+}
+
+.composer-modes::-webkit-scrollbar {
+  display: none;
+}
+
+.mode-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  padding: 5px 11px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    color 0.12s,
+    border-color 0.12s,
+    background 0.12s;
+}
+
+.mode-chip:hover {
+  color: var(--text);
+  border-color: #d5d2c8;
+}
+
+.mode-chip.active {
+  color: #fff;
+  background: var(--brand-grad);
+  border-color: transparent;
+}
+
+.mode-glyph {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.composer-model {
+  flex-shrink: 0;
+  max-width: 190px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 5px 26px 5px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 7px center;
+  transition:
+    border-color 0.12s,
+    color 0.12s;
+}
+
+.composer-model:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
 .attach {
   flex-shrink: 0;
   width: 36px;

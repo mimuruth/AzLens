@@ -33,16 +33,46 @@ export async function POST(req: Request) {
     }
   }
 
-  const { messages, provider, model, agentId, requireApproval, instructions } =
-    await req.json();
+  const {
+    messages,
+    provider,
+    model,
+    agentId,
+    requireApproval,
+    instructions,
+    mode,
+  } = await req.json();
 
   const agent = getAgent(agentId);
   const coreMessages = convertToCoreMessages(messages);
 
+  // A composer "mode" (Kimi-style) prepends a behaviour hint to the prompt.
+  const MODE_HINTS: Record<string, string> = {
+    swarm:
+      "Mode: Swarm. Reason in multiple independent passes over the problem, then synthesise the strongest combined answer and note where the passes disagreed.",
+    slide:
+      "Mode: Slide. Produce a slide-deck outline — a sequence of titled slides, each with 3–5 concise bullet points, ending with a summary slide.",
+    "deep-research":
+      "Mode: Deep Research. Investigate thoroughly: decompose the question, use the available tools extensively to gather evidence, and cite the sources you relied on.",
+    websites:
+      "Mode: Websites. Focus on finding and summarising information as if browsing the web; include relevant links/URLs and clearly separate sources.",
+    docs: "Mode: Docs. Produce a well-structured long-form document with a title, headings, and prose suitable for sharing.",
+    sheets:
+      "Mode: Sheets. Return structured, tabular output as Markdown tables (or CSV) suitable for pasting into a spreadsheet.",
+  };
+  const modeHint =
+    typeof mode === "string" && MODE_HINTS[mode] ? MODE_HINTS[mode] : "";
+
   // Per-conversation instructions (if any) refine the agent's base prompt.
-  const systemPrompt =
+  const extras = [
     typeof instructions === "string" && instructions.trim().length > 0
-      ? `${agent.systemPrompt}\n\nAdditional instructions for this conversation:\n${instructions.trim()}`
+      ? `Additional instructions for this conversation:\n${instructions.trim()}`
+      : "",
+    modeHint,
+  ].filter(Boolean);
+  const systemPrompt =
+    extras.length > 0
+      ? `${agent.systemPrompt}\n\n${extras.join("\n\n")}`
       : agent.systemPrompt;
 
   // Decide the model. An explicit picker choice wins; "auto" (or no choice)

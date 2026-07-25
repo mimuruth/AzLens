@@ -48,3 +48,14 @@ test("saves per-conversation instructions", async ({ page }) => {
     page.getByPlaceholder(/Always answer in TypeScript/i)
   ).toHaveValue("Answer in French.");
 });
+
+test("toggles a composer mode chip", async ({ page }) => {
+  await page.goto("/");
+  const chip = page.getByRole("button", { name: "Deep Research" });
+  await expect(chip).toBeVisible();
+  await expect(chip).toHaveAttribute("aria-pressed", "false");
+  await chip.click();
+  await expect(chip).toHaveAttribute("aria-pressed", "true");
+  await chip.click();
+  await expect(chip).toHaveAttribute("aria-pressed", "false");
+});
