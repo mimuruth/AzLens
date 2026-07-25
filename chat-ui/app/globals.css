@@ -1688,6 +1688,85 @@ code {
   white-space: nowrap;
 }
 
+/* ---- Left-menu entries: AI Agent Guide + Features ---- */
+.side-entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  margin-top: 6px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+}
+
+.side-entry:hover {
+  background: var(--hover);
+}
+
+.side-entry-icon {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.side-entry:hover .side-entry-icon {
+  color: var(--accent);
+}
+
+.features-panel {
+  margin-top: 2px;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.feature-item:hover {
+  background: var(--hover);
+}
+
+.feature-icon {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.feature-item:hover .feature-icon {
+  color: var(--accent);
+}
+
+.feature-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---- Approval toggle (topbar) ---- */
 .approval-toggle {
   display: inline-flex;

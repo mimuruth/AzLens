@@ -109,6 +109,124 @@ const SERVER_TOOLS: Record<string, { name: string; example: string }[]> = {
   ],
 };
 
+const AGENT_GUIDE_PROMPT =
+  "Give me a guide to the available AI agents (General, Code Assistant, Azure Expert, Personal Assistant, GitHub, FinOps, Research, Data Analyst): what each one is best for, and which MCP tools it can use.";
+
+/** Left-menu feature shortcuts (Kimi-style). Clicking drafts a starter prompt. */
+const FEATURE_ITEMS: { id: string; label: string; prompt: string }[] = [
+  {
+    id: "plugin",
+    label: "Plugin",
+    prompt: "What MCP tools and plugins are available, and what can each do?",
+  },
+  {
+    id: "scheduled",
+    label: "Scheduled Tasks",
+    prompt: "Show my scheduled tasks and to-do list.",
+  },
+  {
+    id: "swarm",
+    label: "Swarm",
+    prompt:
+      "Use Swarm mode — reason in multiple passes, then synthesise. Topic: ",
+  },
+  { id: "slide", label: "Slide", prompt: "Create a slide-deck outline for: " },
+  {
+    id: "deep-research",
+    label: "Deep Research",
+    prompt: "Do deep research (use tools, cite sources) on: ",
+  },
+  {
+    id: "websites",
+    label: "Websites",
+    prompt: "Find and summarise websites about: ",
+  },
+  {
+    id: "docs",
+    label: "Docs",
+    prompt: "Write a well-structured document about: ",
+  },
+  {
+    id: "sheets",
+    label: "Sheets",
+    prompt: "Create a spreadsheet table (Markdown/CSV) of: ",
+  },
+];
+
+/** Small icon for each left-menu feature (visually similar to Kimi's set). */
+function FeatureIcon({ id }: { id: string }) {
+  const p = {
+    width: 16,
+    height: 16,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.7,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  switch (id) {
+    case "plugin":
+      return (
+        <svg {...p}>
+          <path d="M9 3v4M15 3v4M7 7h10v4a5 5 0 01-10 0V7zM12 16v5" />
+        </svg>
+      );
+    case "scheduled":
+      return (
+        <svg {...p}>
+          <circle cx="12" cy="12" r="8" />
+          <path d="M12 8v4l3 2" />
+        </svg>
+      );
+    case "swarm":
+      return (
+        <svg {...p}>
+          <path d="M12 3l1.4 4.2L18 8l-4.6 1.4L12 14l-1.4-4.6L6 8l4.6-.8z" />
+          <circle cx="18" cy="17" r="2" />
+          <circle cx="6.5" cy="16.5" r="1.5" />
+        </svg>
+      );
+    case "slide":
+      return (
+        <svg {...p}>
+          <rect x="4" y="5" width="16" height="12" rx="2" />
+          <path d="M4 9h16M12 17v3" />
+        </svg>
+      );
+    case "deep-research":
+      return (
+        <svg {...p}>
+          <circle cx="11" cy="11" r="6" />
+          <path d="M20 20l-4-4" />
+        </svg>
+      );
+    case "websites":
+      return (
+        <svg {...p}>
+          <circle cx="12" cy="12" r="8" />
+          <path d="M4 12h16M12 4c2.6 2.4 2.6 13.2 0 16M12 4c-2.6 2.4-2.6 13.2 0 16" />
+        </svg>
+      );
+    case "docs":
+      return (
+        <svg {...p}>
+          <path d="M7 3h7l5 5v13H7z" />
+          <path d="M14 3v5h5M9 13h6M9 17h6" />
+        </svg>
+      );
+    case "sheets":
+      return (
+        <svg {...p}>
+          <rect x="4" y="4" width="16" height="16" rx="2" />
+          <path d="M4 10h16M4 15h16M10 4v16" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
 export default function Sidebar({
   conversations,
   activeId,
@@ -160,6 +278,7 @@ export default function Sidebar({
   const [servers, setServers] = useState<ServerHealth[]>([]);
   const [libOpen, setLibOpen] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
+  const [featuresOpen, setFeaturesOpen] = useState(true);
   const [library, setLibrary] = useState<{
     prompts: LibraryPrompt[];
     resources: LibraryResource[];
@@ -487,6 +606,72 @@ export default function Sidebar({
           </svg>
           New chat
         </button>
+
+        <button
+          className="side-entry"
+          onClick={() => onUseTool(AGENT_GUIDE_PROMPT)}
+          title="AI Agent Guide"
+        >
+          <span className="side-entry-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M5 4h11a2 2 0 012 2v14H7a2 2 0 01-2-2V4z"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M9 8h6M9 12h6"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+              />
+            </svg>
+          </span>
+          AI Agent Guide
+        </button>
+
+        <div className="tools-panel features-panel">
+          <button
+            className="tools-head"
+            onClick={() => setFeaturesOpen((v) => !v)}
+            aria-expanded={featuresOpen}
+          >
+            <span>Features</span>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              className={featuresOpen ? "chev open" : "chev"}
+            >
+              <path
+                d="M6 9l6 6 6-6"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          {featuresOpen && (
+            <div className="tools-list">
+              {FEATURE_ITEMS.map((f) => (
+                <button
+                  key={f.id}
+                  className="feature-item"
+                  onClick={() => onUseTool(f.prompt)}
+                  title={f.label}
+                >
+                  <span className="feature-icon">
+                    <FeatureIcon id={f.id} />
+                  </span>
+                  <span className="feature-label">{f.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="search">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none">

@@ -51,7 +51,7 @@ test("saves per-conversation instructions", async ({ page }) => {
 
 test("toggles a composer mode chip", async ({ page }) => {
   await page.goto("/");
-  const chip = page.getByRole("button", { name: "Deep Research" });
+  const chip = page.locator("button.mode-chip", { hasText: "Deep Research" });
   await expect(chip).toBeVisible();
   await expect(chip).toHaveAttribute("aria-pressed", "false");
   await chip.click();
