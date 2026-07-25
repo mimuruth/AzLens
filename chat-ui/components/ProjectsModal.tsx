@@ -24,6 +24,7 @@ export default function ProjectsModal({
   onAddFile,
   onRemoveFile,
   onIngest,
+  onCreateIndex,
   fileMax,
 }: {
   projects: Project[];
@@ -40,6 +41,7 @@ export default function ProjectsModal({
   onAddFile: (id: string, file: ProjectFile) => void;
   onRemoveFile: (id: string, fileId: string) => void;
   onIngest: (project: Project) => Promise<string>;
+  onCreateIndex: () => Promise<string>;
   fileMax: number;
 }) {
   const [name, setName] = useState("");
@@ -113,6 +115,22 @@ export default function ProjectsModal({
     setIngestMsg((m) => ({ ...m, [p.id]: "Ingesting\u2026" }));
     try {
       const msg = await onIngest(p);
+      setIngestMsg((m) => ({ ...m, [p.id]: msg }));
+    } catch (err) {
+      setIngestMsg((m) => ({
+        ...m,
+        [p.id]: err instanceof Error ? err.message : String(err),
+      }));
+    } finally {
+      setIngestId(null);
+    }
+  };
+
+  const createIndex = async (p: Project) => {
+    setIngestId(p.id);
+    setIngestMsg((m) => ({ ...m, [p.id]: "Creating index\u2026" }));
+    try {
+      const msg = await onCreateIndex();
       setIngestMsg((m) => ({ ...m, [p.id]: msg }));
     } catch (err) {
       setIngestMsg((m) => ({
@@ -325,6 +343,15 @@ export default function ProjectsModal({
                       Text files added here ground every chat in this project.
                     </span>
                     <div className="project-files-head-actions">
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        disabled={ingestId === p.id}
+                        onClick={() => createIndex(p)}
+                        title="Create the Azure AI Search index (first-time setup)"
+                      >
+                        Create index
+                      </button>
                       {p.files && p.files.length > 0 && (
                         <button
                           type="button"

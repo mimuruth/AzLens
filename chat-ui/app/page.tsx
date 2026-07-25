@@ -46,6 +46,7 @@ import {
   newId,
 } from "@/lib/storage";
 import { DEFAULT_AGENT_ID } from "@/lib/agents";
+import { chunkProjectForIngest, toolResultText } from "@/lib/ingest";
 import {
   cloudInit,
   cloudMessages,
@@ -550,29 +551,8 @@ export default function Page() {
   // they're retrievable via search_knowledge. Files are chunked into passages.
   const ingestProject = useCallback(
     async (project: Project): Promise<string> => {
-      const files = project.files ?? [];
-      if (files.length === 0) return "No files to ingest.";
-      const CHUNK = 1500;
-      const documents: {
-        id: string;
-        title: string;
-        content: string;
-        source: string;
-      }[] = [];
-      for (const f of files) {
-        const text = f.content;
-        const parts = Math.max(1, Math.ceil(text.length / CHUNK));
-        for (let i = 0; i < parts; i++) {
-          const slice = text.slice(i * CHUNK, (i + 1) * CHUNK).trim();
-          if (!slice) continue;
-          documents.push({
-            id: `${project.id}-${f.id}-${i}`,
-            title: parts > 1 ? `${f.name} (part ${i + 1}/${parts})` : f.name,
-            content: slice,
-            source: project.name,
-          });
-        }
-      }
+      if ((project.files ?? []).length === 0) return "No files to ingest.";
+      const documents = chunkProjectForIngest(project);
       if (documents.length === 0) return "Nothing to ingest.";
       const res = await fetch("/api/tool", {
         method: "POST",
@@ -581,14 +561,26 @@ export default function Page() {
       });
       const json = await res.json();
       if (json.error) return `Ingestion failed: ${json.error}`;
-      const parts = json.result?.content;
-      const msg = Array.isArray(parts)
-        ? parts.map((p: { text?: string }) => p.text ?? "").join(" ")
-        : "";
-      return msg || `Ingested ${documents.length} passage(s).`;
+      return (
+        toolResultText(json.result) ||
+        `Ingested ${documents.length} passage(s).`
+      );
     },
     []
   );
+
+  // Create the Azure AI Search index (mcp-knowledge create_index) so first-time
+  // setup is one click before ingesting.
+  const createProjectIndex = useCallback(async (): Promise<string> => {
+    const res = await fetch("/api/tool", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ tool: "create_index", args: {} }),
+    });
+    const json = await res.json();
+    if (json.error) return `Create index failed: ${json.error}`;
+    return toolResultText(json.result) || "Index ready.";
+  }, []);
 
   const deleteProject = useCallback(
     (id: string) => {
@@ -774,6 +766,7 @@ export default function Page() {
           onAddFile={addProjectFile}
           onRemoveFile={removeProjectFile}
           onIngest={ingestProject}
+          onCreateIndex={createProjectIndex}
           fileMax={PROJECT_FILE_MAX}
         />
       )}
