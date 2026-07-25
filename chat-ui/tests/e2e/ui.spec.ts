@@ -59,3 +59,18 @@ test("toggles a composer mode chip", async ({ page }) => {
   await chip.click();
   await expect(chip).toHaveAttribute("aria-pressed", "false");
 });
+
+test("sidebar feature activates the matching composer mode", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const chip = page.locator("button.mode-chip", { hasText: "Deep Research" });
+  await expect(chip).toHaveAttribute("aria-pressed", "false");
+  await page
+    .locator("button.feature-item", { hasText: "Deep Research" })
+    .click();
+  await expect(chip).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByPlaceholder("Message AzLens…")).toHaveValue(
+    /deep research/i
+  );
+});

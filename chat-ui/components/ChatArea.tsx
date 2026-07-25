@@ -227,7 +227,7 @@ export default function ChatArea({
   templates: PromptTemplate[];
   onSaveTemplate: (title: string, text: string) => void;
   onBookmark: (message: UIMessage) => void;
-  prefill: { text: string; nonce: number } | null;
+  prefill: { text: string; nonce: number; mode?: string | null } | null;
   onMessages: (id: string, messages: UIMessage[]) => void;
   onToggleSidebar: () => void;
 }) {
@@ -313,6 +313,9 @@ export default function ChatArea({
     if (prefill && prefill.text) {
       setInput(prefill.text);
       textareaRef.current?.focus();
+    }
+    if (prefill && prefill.mode !== undefined) {
+      setMode(prefill.mode);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill?.nonce]);

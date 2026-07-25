@@ -59,6 +59,7 @@ export default function Page() {
   const [prefill, setPrefill] = useState<{
     text: string;
     nonce: number;
+    mode?: string | null;
   } | null>(null);
   const [ready, setReady] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -296,8 +297,8 @@ export default function Page() {
     });
   }, []);
 
-  const useTool = useCallback((text: string) => {
-    setPrefill({ text, nonce: Date.now() });
+  const useTool = useCallback((text: string, mode?: string | null) => {
+    setPrefill({ text, nonce: Date.now(), mode });
   }, []);
 
   const exportChat = useCallback(() => {

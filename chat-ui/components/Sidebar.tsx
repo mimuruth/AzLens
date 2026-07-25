@@ -112,8 +112,14 @@ const SERVER_TOOLS: Record<string, { name: string; example: string }[]> = {
 const AGENT_GUIDE_PROMPT =
   "Give me a guide to the available AI agents (General, Code Assistant, Azure Expert, Personal Assistant, GitHub, FinOps, Research, Data Analyst): what each one is best for, and which MCP tools it can use.";
 
-/** Left-menu feature shortcuts (Kimi-style). Clicking drafts a starter prompt. */
-const FEATURE_ITEMS: { id: string; label: string; prompt: string }[] = [
+/** Left-menu feature shortcuts (Kimi-style). Clicking drafts a starter prompt
+ * and, for the mode features, activates the matching composer mode chip. */
+const FEATURE_ITEMS: {
+  id: string;
+  label: string;
+  prompt: string;
+  mode?: string;
+}[] = [
   {
     id: "plugin",
     label: "Plugin",
@@ -129,27 +135,37 @@ const FEATURE_ITEMS: { id: string; label: string; prompt: string }[] = [
     label: "Swarm",
     prompt:
       "Use Swarm mode — reason in multiple passes, then synthesise. Topic: ",
+    mode: "swarm",
   },
-  { id: "slide", label: "Slide", prompt: "Create a slide-deck outline for: " },
+  {
+    id: "slide",
+    label: "Slide",
+    prompt: "Create a slide-deck outline for: ",
+    mode: "slide",
+  },
   {
     id: "deep-research",
     label: "Deep Research",
     prompt: "Do deep research (use tools, cite sources) on: ",
+    mode: "deep-research",
   },
   {
     id: "websites",
     label: "Websites",
     prompt: "Find and summarise websites about: ",
+    mode: "websites",
   },
   {
     id: "docs",
     label: "Docs",
     prompt: "Write a well-structured document about: ",
+    mode: "docs",
   },
   {
     id: "sheets",
     label: "Sheets",
     prompt: "Create a spreadsheet table (Markdown/CSV) of: ",
+    mode: "sheets",
   },
 ];
 
@@ -260,7 +276,7 @@ export default function Sidebar({
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onTogglePin: (id: string) => void;
-  onUseTool: (prompt: string) => void;
+  onUseTool: (prompt: string, mode?: string | null) => void;
   onClearAll: () => void;
   onToggleTheme: () => void;
   bookmarks: Bookmark[];
@@ -660,7 +676,7 @@ export default function Sidebar({
                 <button
                   key={f.id}
                   className="feature-item"
-                  onClick={() => onUseTool(f.prompt)}
+                  onClick={() => onUseTool(f.prompt, f.mode ?? null)}
                   title={f.label}
                 >
                   <span className="feature-icon">
