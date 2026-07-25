@@ -18,6 +18,7 @@ export default function ProjectsModal({
   onDelete,
   onSetInstructions,
   onSelect,
+  onMoveProject,
 }: {
   projects: Project[];
   activeProjectId: string | null;
@@ -28,6 +29,7 @@ export default function ProjectsModal({
   onDelete: (id: string) => void;
   onSetInstructions: (id: string, text: string) => void;
   onSelect: (id: string | null) => void;
+  onMoveProject: (id: string, dir: "up" | "down") => void;
 }) {
   const [name, setName] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -120,7 +122,7 @@ export default function ProjectsModal({
               shared instructions.
             </p>
           )}
-          {projects.map((p) => (
+          {projects.map((p, i) => (
             <div
               key={p.id}
               className={`project-item ${
@@ -138,6 +140,26 @@ export default function ProjectsModal({
                   <span className="project-count">{countFor(p.id)}</span>
                 </button>
                 <div className="project-actions">
+                  <button
+                    type="button"
+                    className="msg-action"
+                    disabled={i === 0}
+                    onClick={() => onMoveProject(p.id, "up")}
+                    title="Move up"
+                    aria-label="Move up"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className="msg-action"
+                    disabled={i === projects.length - 1}
+                    onClick={() => onMoveProject(p.id, "down")}
+                    title="Move down"
+                    aria-label="Move down"
+                  >
+                    ↓
+                  </button>
                   <button
                     type="button"
                     className="msg-action"

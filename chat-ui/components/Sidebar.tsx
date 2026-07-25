@@ -453,6 +453,28 @@ export default function Sidebar({
             {c.title}
           </span>
         )}
+        {(() => {
+          const proj = c.projectId
+            ? projects.find((p) => p.id === c.projectId)
+            : undefined;
+          if (!proj?.instructions) return null;
+          return (
+            <span
+              className="chat-instr-dot"
+              title={`Uses project instructions from “${proj.name}”`}
+              aria-label="Uses project instructions"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M4 6h16M4 12h16M4 18h10"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </span>
+          );
+        })()}
         <button
           className={`chat-pin ${c.pinned ? "pinned" : ""}`}
           aria-label={c.pinned ? "Unpin chat" : "Pin chat"}

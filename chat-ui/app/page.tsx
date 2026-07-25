@@ -121,6 +121,11 @@ export default function Page() {
         if (cloud.enabled && loadProjects().length === 0) {
           const cp = await cloudProjects();
           if (cp.length > 0) {
+            cp.sort(
+              (a, b) =>
+                (a.order ?? Number.MAX_SAFE_INTEGER) -
+                (b.order ?? Number.MAX_SAFE_INTEGER)
+            );
             saveProjects(cp);
             setProjects(cp);
           }
@@ -476,6 +481,21 @@ export default function Page() {
     });
   }, []);
 
+  const moveProject = useCallback((id: string, dir: "up" | "down") => {
+    setProjects((prev) => {
+      const idx = prev.findIndex((p) => p.id === id);
+      if (idx < 0) return prev;
+      const swap = dir === "up" ? idx - 1 : idx + 1;
+      if (swap < 0 || swap >= prev.length) return prev;
+      const list = [...prev];
+      [list[idx], list[swap]] = [list[swap], list[idx]];
+      const ordered = list.map((p, i) => ({ ...p, order: i }));
+      saveProjects(ordered);
+      ordered.forEach((p) => cloudSaveProject(p));
+      return ordered;
+    });
+  }, []);
+
   const deleteProject = useCallback(
     (id: string) => {
       setProjects((prev) => {
@@ -655,6 +675,7 @@ export default function Page() {
           onDelete={deleteProject}
           onSetInstructions={setProjectInstructions}
           onSelect={selectProject}
+          onMoveProject={moveProject}
         />
       )}
       {paletteOpen && (

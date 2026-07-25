@@ -227,6 +227,7 @@ export type Project = {
   name: string;
   instructions?: string;
   createdAt: number;
+  order?: number;
 };
 
 const PROJECTS_KEY = "azlens.projects";

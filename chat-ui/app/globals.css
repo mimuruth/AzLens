@@ -2032,6 +2032,20 @@ code {
   color: #dc2626;
 }
 
+.msg-action:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Small indicator on chats that inherit project instructions */
+.chat-instr-dot {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--accent);
+  opacity: 0.75;
+}
+
 .project-instr {
   padding: 0 10px 10px;
   display: flex;

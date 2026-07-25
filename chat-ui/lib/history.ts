@@ -109,6 +109,7 @@ export type StoredProject = {
   name: string;
   instructions?: string;
   createdAt: number;
+  order?: number;
 };
 
 export type ProjectMeta = Omit<StoredProject, "userId" | "docType">;
@@ -119,7 +120,7 @@ export async function listProjects(userId: string): Promise<ProjectMeta[]> {
   const { resources } = await container.items
     .query<ProjectMeta>({
       query:
-        "SELECT c.id, c.name, c.instructions, c.createdAt " +
+        'SELECT c.id, c.name, c.instructions, c.createdAt, c["order"] ' +
         "FROM c WHERE c.userId = @u AND c.docType = 'project' ORDER BY c.createdAt DESC",
       parameters: [{ name: "@u", value: userId }],
     })
