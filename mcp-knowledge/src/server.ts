@@ -13,8 +13,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
   SearchClient,
+  SearchIndexClient,
   AzureKeyCredential,
   type SearchDocumentsResult,
+  type SearchIndex,
 } from "@azure/search-documents";
 import { DefaultAzureCredential } from "@azure/identity";
 
@@ -23,12 +25,14 @@ const INDEX = process.env.AZURE_SEARCH_INDEX ?? "";
 const API_KEY = process.env.AZURE_SEARCH_API_KEY ?? "";
 const CONTENT_FIELD = process.env.AZURE_SEARCH_CONTENT_FIELD || "content";
 const TITLE_FIELD = process.env.AZURE_SEARCH_TITLE_FIELD || "title";
+const KEY_FIELD = process.env.AZURE_SEARCH_KEY_FIELD || "id";
 const SEMANTIC_CONFIG = process.env.AZURE_SEARCH_SEMANTIC_CONFIG || "";
 
 type Doc = Record<string, unknown>;
 
 const credential = new DefaultAzureCredential();
 let client: SearchClient<Doc> | undefined;
+let indexClient: SearchIndexClient | undefined;
 
 function getClient(): SearchClient<Doc> {
   if (!ENDPOINT || !INDEX) {
@@ -42,6 +46,20 @@ function getClient(): SearchClient<Doc> {
     client = new SearchClient<Doc>(ENDPOINT, INDEX, cred);
   }
   return client;
+}
+
+function getIndexClient(): SearchIndexClient {
+  if (!ENDPOINT) {
+    throw new Error(
+      "Azure AI Search is not configured: set AZURE_SEARCH_ENDPOINT in the " +
+        "environment."
+    );
+  }
+  if (!indexClient) {
+    const cred = API_KEY ? new AzureKeyCredential(API_KEY) : credential;
+    indexClient = new SearchIndexClient(ENDPOINT, cred);
+  }
+  return indexClient;
 }
 
 /** Returns a human-readable hint when NOT ready, or null when good to go. */
@@ -162,6 +180,171 @@ export function createServer(): McpServer {
       } catch (err) {
         const detail = err instanceof Error ? err.message : String(err);
         return text(`Could not fetch document "${key}": ${detail}`);
+      }
+    }
+  );
+
+  // ------------------------------------------------------------------------
+  // Tool: create_index
+  // ------------------------------------------------------------------------
+  server.registerTool(
+    "create_index",
+    {
+      title: "Create Search Index",
+      description:
+        "Create the Azure AI Search index (if it does not already exist) with " +
+        "a simple schema: a string key field, plus searchable title and " +
+        "content fields and a filterable source field. Requires write access " +
+        "(an admin API key, or the Search Service Contributor role).",
+      inputSchema: {
+        force: z
+          .boolean()
+          .default(false)
+          .optional()
+          .describe("Recreate the index even if it already exists."),
+      },
+    },
+    async ({ force }) => {
+      const notReady = await checkAuth();
+      if (notReady) return text(notReady);
+      try {
+        const idx = getIndexClient();
+        if (force) {
+          try {
+            await idx.deleteIndex(INDEX);
+          } catch {
+            /* not there yet */
+          }
+        } else {
+          try {
+            await idx.getIndex(INDEX);
+            return text(`Index "${INDEX}" already exists.`);
+          } catch {
+            /* fall through to create */
+          }
+        }
+        const definition: SearchIndex = {
+          name: INDEX,
+          fields: [
+            {
+              name: KEY_FIELD,
+              type: "Edm.String",
+              key: true,
+              filterable: true,
+            },
+            { name: TITLE_FIELD, type: "Edm.String", searchable: true },
+            { name: CONTENT_FIELD, type: "Edm.String", searchable: true },
+            {
+              name: "source",
+              type: "Edm.String",
+              filterable: true,
+              facetable: true,
+            },
+          ],
+        };
+        await idx.createIndex(definition);
+        return text(`Created index "${INDEX}".`);
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        return text(`Could not create index "${INDEX}": ${detail}`);
+      }
+    }
+  );
+
+  // ------------------------------------------------------------------------
+  // Tool: ingest_documents
+  // ------------------------------------------------------------------------
+  server.registerTool(
+    "ingest_documents",
+    {
+      title: "Ingest Documents",
+      description:
+        "Upload (merge-or-upload) one or more documents into the Azure AI " +
+        "Search index so they become searchable via search_knowledge. Each " +
+        "document needs a unique id, plus title and content. Requires write " +
+        "access (an admin API key, or the Search Index Data Contributor role).",
+      inputSchema: {
+        documents: z
+          .array(
+            z.object({
+              id: z.string().min(1).describe("Unique document key."),
+              title: z.string().default("").optional(),
+              content: z.string().min(1).describe("The document body."),
+              source: z
+                .string()
+                .optional()
+                .describe("Optional origin label (e.g. project or file name)."),
+            })
+          )
+          .min(1)
+          .max(1000)
+          .describe("The documents to ingest."),
+      },
+    },
+    async ({ documents }) => {
+      const notReady = await checkAuth();
+      if (notReady) return text(notReady);
+      try {
+        const docs: Doc[] = documents.map((d) => ({
+          [KEY_FIELD]: d.id,
+          [TITLE_FIELD]: d.title ?? "",
+          [CONTENT_FIELD]: d.content,
+          ...(d.source ? { source: d.source } : {}),
+        }));
+        const result = await getClient().mergeOrUploadDocuments(docs);
+        const failed = result.results.filter((r) => !r.succeeded);
+        if (failed.length > 0) {
+          const first = failed[0];
+          return text(
+            `Ingested ${result.results.length - failed.length}/${
+              result.results.length
+            } documents; ${failed.length} failed. First error: ${
+              first.errorMessage ?? `key ${first.key}`
+            }`
+          );
+        }
+        return text(
+          `Ingested ${result.results.length} document(s) into "${INDEX}".`
+        );
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        return text(`Ingestion failed: ${detail}`);
+      }
+    }
+  );
+
+  // ------------------------------------------------------------------------
+  // Tool: delete_documents
+  // ------------------------------------------------------------------------
+  server.registerTool(
+    "delete_documents",
+    {
+      title: "Delete Documents",
+      description:
+        "Delete documents from the index by their keys. Requires write access " +
+        "(an admin API key, or the Search Index Data Contributor role).",
+      inputSchema: {
+        keys: z
+          .array(z.string().min(1))
+          .min(1)
+          .max(1000)
+          .describe("The document keys to delete."),
+      },
+    },
+    async ({ keys }) => {
+      const notReady = await checkAuth();
+      if (notReady) return text(notReady);
+      try {
+        const result = await getClient().deleteDocuments(
+          keys.map((k) => ({ [KEY_FIELD]: k }))
+        );
+        const ok = result.results.filter((r) => r.succeeded).length;
+        return text(
+          `Deleted ${ok}/${keys.length} document(s) from "${INDEX}".`
+        );
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        return text(`Delete failed: ${detail}`);
       }
     }
   );

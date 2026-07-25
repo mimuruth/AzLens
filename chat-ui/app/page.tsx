@@ -546,6 +546,50 @@ export default function Page() {
     });
   }, []);
 
+  // Push a project's files into the Azure AI Search index (mcp-knowledge) so
+  // they're retrievable via search_knowledge. Files are chunked into passages.
+  const ingestProject = useCallback(
+    async (project: Project): Promise<string> => {
+      const files = project.files ?? [];
+      if (files.length === 0) return "No files to ingest.";
+      const CHUNK = 1500;
+      const documents: {
+        id: string;
+        title: string;
+        content: string;
+        source: string;
+      }[] = [];
+      for (const f of files) {
+        const text = f.content;
+        const parts = Math.max(1, Math.ceil(text.length / CHUNK));
+        for (let i = 0; i < parts; i++) {
+          const slice = text.slice(i * CHUNK, (i + 1) * CHUNK).trim();
+          if (!slice) continue;
+          documents.push({
+            id: `${project.id}-${f.id}-${i}`,
+            title: parts > 1 ? `${f.name} (part ${i + 1}/${parts})` : f.name,
+            content: slice,
+            source: project.name,
+          });
+        }
+      }
+      if (documents.length === 0) return "Nothing to ingest.";
+      const res = await fetch("/api/tool", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tool: "ingest_documents", args: { documents } }),
+      });
+      const json = await res.json();
+      if (json.error) return `Ingestion failed: ${json.error}`;
+      const parts = json.result?.content;
+      const msg = Array.isArray(parts)
+        ? parts.map((p: { text?: string }) => p.text ?? "").join(" ")
+        : "";
+      return msg || `Ingested ${documents.length} passage(s).`;
+    },
+    []
+  );
+
   const deleteProject = useCallback(
     (id: string) => {
       setProjects((prev) => {
@@ -729,6 +773,7 @@ export default function Page() {
           onReorderProjects={reorderProjects}
           onAddFile={addProjectFile}
           onRemoveFile={removeProjectFile}
+          onIngest={ingestProject}
           fileMax={PROJECT_FILE_MAX}
         />
       )}

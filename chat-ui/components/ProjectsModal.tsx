@@ -23,6 +23,7 @@ export default function ProjectsModal({
   onReorderProjects,
   onAddFile,
   onRemoveFile,
+  onIngest,
   fileMax,
 }: {
   projects: Project[];
@@ -38,6 +39,7 @@ export default function ProjectsModal({
   onReorderProjects: (fromId: string, toId: string) => void;
   onAddFile: (id: string, file: ProjectFile) => void;
   onRemoveFile: (id: string, fileId: string) => void;
+  onIngest: (project: Project) => Promise<string>;
   fileMax: number;
 }) {
   const [name, setName] = useState("");
@@ -46,6 +48,8 @@ export default function ProjectsModal({
   const [draft, setDraft] = useState("");
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropId, setDropId] = useState<string | null>(null);
+  const [ingestId, setIngestId] = useState<string | null>(null);
+  const [ingestMsg, setIngestMsg] = useState<Record<string, string>>({});
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadTarget = useRef<string | null>(null);
@@ -102,6 +106,22 @@ export default function ProjectsModal({
       });
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const ingest = async (p: Project) => {
+    setIngestId(p.id);
+    setIngestMsg((m) => ({ ...m, [p.id]: "Ingesting\u2026" }));
+    try {
+      const msg = await onIngest(p);
+      setIngestMsg((m) => ({ ...m, [p.id]: msg }));
+    } catch (err) {
+      setIngestMsg((m) => ({
+        ...m,
+        [p.id]: err instanceof Error ? err.message : String(err),
+      }));
+    } finally {
+      setIngestId(null);
+    }
   };
 
   return (
@@ -304,14 +324,32 @@ export default function ProjectsModal({
                     <span className="project-files-hint">
                       Text files added here ground every chat in this project.
                     </span>
-                    <button
-                      type="button"
-                      className="btn-primary"
-                      onClick={() => pickFiles(p.id)}
-                    >
-                      Add files
-                    </button>
+                    <div className="project-files-head-actions">
+                      {p.files && p.files.length > 0 && (
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          disabled={ingestId === p.id}
+                          onClick={() => ingest(p)}
+                          title="Push these files to the Azure AI Search index (mcp-knowledge)"
+                        >
+                          {ingestId === p.id
+                            ? "Ingesting\u2026"
+                            : "Ingest to knowledge base"}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        onClick={() => pickFiles(p.id)}
+                      >
+                        Add files
+                      </button>
+                    </div>
                   </div>
+                  {ingestMsg[p.id] && (
+                    <p className="project-files-status">{ingestMsg[p.id]}</p>
+                  )}
                   {p.files && p.files.length > 0 ? (
                     <ul className="project-files-list">
                       {p.files.map((f) => (

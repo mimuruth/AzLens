@@ -2107,6 +2107,19 @@ code {
   gap: 10px;
 }
 
+.project-files-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.project-files-status {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
 .project-files-hint {
   font-size: 12px;
   color: var(--text-muted);

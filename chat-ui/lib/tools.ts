@@ -11,6 +11,9 @@ export const SENSITIVE_TOOLS: Record<string, ServerKey> = {
   create_issue: "github",
   add_issue_comment: "github",
   create_pull_request: "github",
+  ingest_documents: "knowledge",
+  create_index: "knowledge",
+  delete_documents: "knowledge",
 };
 
 export function isSensitiveTool(name: string): boolean {
