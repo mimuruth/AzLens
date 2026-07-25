@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AzLens — Product Deck</title>
+    <style>
+      :root {
+        --bg-0: #0b1020;
+        --bg-1: #0e1630;
+        --ink: #eaf0ff;
+        --muted: #9fb0d6;
+        --accent: #4f8cff;
+        --accent-2: #7c5cff;
+        --accent-3: #22d3ee;
+        --good: #34d399;
+        --warn: #f59e0b;
+        --card: rgba(255, 255, 255, 0.045);
+        --card-brd: rgba(255, 255, 255, 0.09);
+        --radius: 18px;
+        --shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+        --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        --mono: ui-monospace, "SF Mono", "Cascadia Code", "Fira Code", monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      body {
+        font-family: var(--font);
+        color: var(--ink);
+        background:
+          radial-gradient(1200px 700px at 15% -10%, #1b2a5e 0%, transparent 55%),
+          radial-gradient(1000px 700px at 110% 10%, #3a1f6e 0%, transparent 50%),
+          radial-gradient(900px 900px at 50% 120%, #0a2a3a 0%, transparent 55%),
+          linear-gradient(160deg, var(--bg-0), var(--bg-1));
+        overflow: hidden;
+      }
+
+      /* ---- Deck / slides ---- */
+      .deck {
+        position: relative;
+        height: 100vh;
+        width: 100vw;
+      }
+      .slide {
+        position: absolute;
+        inset: 0;
+        display: none;
+        flex-direction: column;
+        justify-content: center;
+        padding: clamp(28px, 6vw, 96px);
+        opacity: 0;
+        transform: translateY(24px) scale(0.99);
+        transition: opacity 0.5s ease, transform 0.5s ease;
+        overflow: auto;
+      }
+      .slide.active {
+        display: flex;
+        opacity: 1;
+        transform: none;
+        animation: rise 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(26px) scale(0.99);
+        }
+      }
+
+      .kicker {
+        font-size: clamp(12px, 1.3vw, 15px);
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--accent-3);
+        font-weight: 700;
+        margin-bottom: 14px;
+      }
+      h1 {
+        font-size: clamp(40px, 7.2vw, 104px);
+        line-height: 1.02;
+        margin: 0 0 18px;
+        letter-spacing: -0.02em;
+        font-weight: 800;
+      }
+      h2 {
+        font-size: clamp(28px, 4.4vw, 58px);
+        line-height: 1.06;
+        margin: 0 0 26px;
+        letter-spacing: -0.015em;
+        font-weight: 800;
+      }
+      .grad {
+        background: linear-gradient(100deg, var(--accent-3), var(--accent), var(--accent-2));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      p.lead {
+        font-size: clamp(17px, 2.1vw, 26px);
+        color: var(--muted);
+        max-width: 60ch;
+        line-height: 1.5;
+        margin: 0;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: clamp(15px, 1.7vw, 20px);
+      }
+
+      /* ---- Layout helpers ---- */
+      .grid {
+        display: grid;
+        gap: clamp(12px, 1.5vw, 20px);
+        margin-top: 10px;
+      }
+      .g2 { grid-template-columns: repeat(2, 1fr); }
+      .g3 { grid-template-columns: repeat(3, 1fr); }
+      .g4 { grid-template-columns: repeat(4, 1fr); }
+      @media (max-width: 900px) {
+        .g3, .g4 { grid-template-columns: repeat(2, 1fr); }
+        .g2 { grid-template-columns: 1fr; }
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--card-brd);
+        border-radius: var(--radius);
+        padding: clamp(16px, 1.8vw, 24px);
+        backdrop-filter: blur(6px);
+        transition: transform 0.25s ease, border-color 0.25s ease, background 0.25s;
+      }
+      .card:hover {
+        transform: translateY(-4px);
+        border-color: rgba(124, 156, 255, 0.5);
+        background: rgba(255, 255, 255, 0.07);
+      }
+      .card .t {
+        font-weight: 700;
+        font-size: clamp(16px, 1.8vw, 21px);
+        margin: 6px 0 6px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .card .d {
+        color: var(--muted);
+        font-size: clamp(13px, 1.4vw, 16px);
+        line-height: 1.45;
+      }
+      .chip {
+        display: inline-block;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--accent-3);
+        background: rgba(34, 211, 238, 0.1);
+        border: 1px solid rgba(34, 211, 238, 0.25);
+        border-radius: 999px;
+        padding: 2px 9px;
+        margin: 3px 4px 0 0;
+      }
+      .port {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--muted);
+        margin-left: auto;
+      }
+      .ico {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        font-size: 20px;
+        background: linear-gradient(135deg, rgba(79, 140, 255, 0.25), rgba(124, 92, 255, 0.25));
+        border: 1px solid var(--card-brd);
+        flex-shrink: 0;
+      }
+
+      ul.feat {
+        margin: 6px 0 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 12px;
+      }
+      ul.feat li {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        font-size: clamp(15px, 1.7vw, 20px);
+        line-height: 1.4;
+      }
+      ul.feat li::before {
+        content: "";
+        width: 10px;
+        height: 10px;
+        margin-top: 8px;
+        border-radius: 3px;
+        background: linear-gradient(135deg, var(--accent-3), var(--accent-2));
+        flex-shrink: 0;
+      }
+      ul.feat li b { color: var(--ink); }
+      ul.feat li span { color: var(--muted); }
+
+      .stat {
+        text-align: center;
+      }
+      .stat .n {
+        font-size: clamp(34px, 5vw, 64px);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        background: linear-gradient(120deg, var(--accent-3), var(--accent), var(--accent-2));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .stat .l {
+        color: var(--muted);
+        font-size: clamp(13px, 1.4vw, 16px);
+        margin-top: 4px;
+      }
+
+      .flow {
+        display: flex;
+        align-items: stretch;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+      }
+      .flow .step {
+        flex: 1 1 130px;
+        text-align: center;
+      }
+      .flow .arrow {
+        align-self: center;
+        color: var(--accent);
+        font-size: 26px;
+      }
+      @media (max-width: 900px) {
+        .flow .arrow { transform: rotate(90deg); }
+      }
+
+      .logo {
+        font-family: var(--mono);
+        font-weight: 800;
+        font-size: clamp(20px, 2.4vw, 30px);
+        letter-spacing: 0.02em;
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .logo .dot {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: conic-gradient(from 180deg, var(--accent-3), var(--accent), var(--accent-2), var(--accent-3));
+        box-shadow: 0 0 22px rgba(79, 140, 255, 0.7);
+      }
+      .title-badges { margin-top: 26px; }
+
+      .foot {
+        position: absolute;
+        left: clamp(28px, 6vw, 96px);
+        right: clamp(28px, 6vw, 96px);
+        bottom: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      /* ---- Chrome: progress, counter, controls ---- */
+      .progress {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--accent-3), var(--accent), var(--accent-2));
+        width: 0;
+        z-index: 40;
+        transition: width 0.4s ease;
+      }
+      .counter {
+        position: fixed;
+        top: 16px;
+        right: 22px;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--muted);
+        z-index: 40;
+      }
+      .nav {
+        position: fixed;
+        bottom: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 8px;
+        z-index: 40;
+      }
+      .nav button {
+        width: 40px;
+        height: 34px;
+        border-radius: 10px;
+        border: 1px solid var(--card-brd);
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--ink);
+        cursor: pointer;
+        font-size: 16px;
+        transition: background 0.2s, transform 0.15s;
+      }
+      .nav button:hover { background: rgba(255, 255, 255, 0.14); transform: translateY(-2px); }
+      .dots {
+        position: fixed;
+        bottom: 20px;
+        left: 22px;
+        display: flex;
+        gap: 7px;
+        z-index: 40;
+      }
+      .dots i {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.22);
+        cursor: pointer;
+        transition: transform 0.2s, background 0.2s;
+      }
+      .dots i.on {
+        background: linear-gradient(120deg, var(--accent-3), var(--accent-2));
+        transform: scale(1.5);
+      }
+      .hint {
+        position: fixed;
+        top: 16px;
+        left: 22px;
+        font-size: 12px;
+        color: var(--muted);
+        z-index: 40;
+        opacity: 0.7;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="progress" id="progress"></div>
+    <div class="hint">← → / Space · F fullscreen</div>
+
+    <div class="deck" id="deck">
+      <!-- 1 · Title -->
+      <section class="slide">
+        <div class="logo"><span class="dot"></span> AzLens</div>
+        <div class="kicker" style="margin-top: 40px">Model Context Protocol · Azure-native</div>
+        <h1>The context layer<br /><span class="grad">for AI agents.</span></h1>
+        <p class="lead">
+          A TypeScript monorepo of seven decoupled MCP servers and a ChatGPT-style web UI —
+          deployable end-to-end to Azure Container Apps from a single workflow.
+        </p>
+        <div class="title-badges">
+          <span class="chip">Next.js 14</span>
+          <span class="chip">7 MCP servers</span>
+          <span class="chip">Azure Container Apps</span>
+          <span class="chip">Cosmos DB</span>
+          <span class="chip">Vitest + Playwright</span>
+        </div>
+        <div class="foot"><span>AzLens · Product Overview</span><span>2026</span></div>
+      </section>
+
+      <!-- 2 · What is AzLens -->
+      <section class="slide">
+        <div class="kicker">What is it</div>
+        <h2>One workspace, <span class="grad">many capabilities</span></h2>
+        <div class="grid g2">
+          <div>
+            <p class="lead" style="margin-bottom: 22px">
+              AzLens gives a language model a curated set of tools — files, Azure, GitHub,
+              cost, knowledge, and SQL — through the open <b style="color:var(--ink)">Model Context Protocol</b>,
+              and a polished chat experience to drive them.
+            </p>
+            <ul class="feat">
+              <li><b>Decoupled by design&nbsp;</b><span>— each server owns one domain and ships independently.</span></li>
+              <li><b>Dual transport&nbsp;</b><span>— stdio for local clients, HTTP for the cloud, one codebase.</span></li>
+              <li><b>Azure-native&nbsp;</b><span>— managed identity, Key Vault, Cosmos, and Easy Auth.</span></li>
+            </ul>
+          </div>
+          <div class="grid g2" style="align-content: start">
+            <div class="card stat"><div class="n">7</div><div class="l">MCP servers</div></div>
+            <div class="card stat"><div class="n">8</div><div class="l">Switchable agents</div></div>
+            <div class="card stat"><div class="n">2</div><div class="l">Transports each</div></div>
+            <div class="card stat"><div class="n">1</div><div class="l">Deploy workflow</div></div>
+          </div>
+        </div>
+        <div class="foot"><span>Overview</span><span>02</span></div>
+      </section>
+
+      <!-- 3 · The seven servers -->
+      <section class="slide">
+        <div class="kicker">The fleet</div>
+        <h2>Seven <span class="grad">MCP servers</span></h2>
+        <div class="grid g3">
+          <div class="card">
+            <div class="t"><span class="ico">📁</span> local-coder <span class="port">:3001</span></div>
+            <div class="d">Read/write files &amp; search code across the workspace.</div>
+          </div>
+          <div class="card">
+            <div class="t"><span class="ico">☁️</span> AzLens-mcp <span class="port">:3002</span></div>
+            <div class="d">Azure ARM queries, KQL log analytics, and wiki search.</div>
+          </div>
+          <div class="card">
+            <div class="t"><span class="ico">✓</span> personal-assistant <span class="port">:3003</span></div>
+            <div class="d">Daily notes and a persistent to-do list.</div>
+          </div>
+          <div class="card">
+            <div class="t"><span class="ico">⑂</span> github <span class="port">:3004</span></div>
+            <div class="d">Repos, issues, PRs, file contents — read and write.</div>
+          </div>
+          <div class="card">
+            <div class="t"><span class="ico">$</span> azure-cost <span class="port">:3005</span></div>
+            <div class="d">FinOps: query spend, forecast cost, review budgets.</div>
+          </div>
+          <div class="card">
+            <div class="t"><span class="ico">◈</span> knowledge <span class="port">:3006</span></div>
+            <div class="d">RAG over Azure AI Search — ingest, search, cite.</div>
+          </div>
+          <div class="card">
+            <div class="t"><span class="ico">▤</span> postgres <span class="port">:3007</span></div>
+            <div class="d">Read-only SQL: list tables, describe schema, query.</div>
+          </div>
+          <div class="card" style="border-style: dashed">
+            <div class="t"><span class="ico">💬</span> chat-ui <span class="port">:3000</span></div>
+            <div class="d">Next.js front end — MCP client over all seven.</div>
+          </div>
+        </div>
+        <div class="foot"><span>Architecture</span><span>03</span></div>
+      </section>
+
+      <!-- 4 · Dual transport -->
+      <section class="slide">
+        <div class="kicker">One codebase, two doors</div>
+        <h2>Write once, <span class="grad">run anywhere</span></h2>
+        <p class="lead" style="margin-bottom: 26px">
+          Each server's logic lives once in <code style="font-family:var(--mono);color:var(--accent-3)">server.ts</code>
+          and is reused by both entry points.
+        </p>
+        <div class="grid g2">
+          <div class="card">
+            <div class="t"><span class="ico">🖥️</span> stdio · index.js</div>
+            <div class="d">For locally-spawned clients — Claude Desktop, VS Code, and other MCP hosts on your machine.</div>
+            <div style="margin-top:12px"><span class="chip">local</span><span class="chip">zero network</span></div>
+          </div>
+          <div class="card">
+            <div class="t"><span class="ico">🌐</span> Streamable HTTP · http.js</div>
+            <div class="d">For remote hosting on Azure Container Apps — internal ingress, session-based transport.</div>
+            <div style="margin-top:12px"><span class="chip">cloud</span><span class="chip">/mcp endpoint</span></div>
+          </div>
+        </div>
+        <div class="foot"><span>Architecture</span><span>04</span></div>
+      </section>
+
+      <!-- 5 · The eight agents -->
+      <section class="slide">
+        <div class="kicker">Personas</div>
+        <h2>Eight <span class="grad">focused agents</span></h2>
+        <p class="sub" style="margin-bottom:18px">Each agent is scoped to the right MCP servers, so its tool set stays sharp.</p>
+        <div class="grid g4">
+          <div class="card"><div class="t">✦ General</div><div class="d">All tools, every server.</div></div>
+          <div class="card"><div class="t">⌘ Code Assistant</div><div class="d">Read, write &amp; search code.</div></div>
+          <div class="card"><div class="t">☁ Azure Expert</div><div class="d">ARM, KQL &amp; the wiki.</div></div>
+          <div class="card"><div class="t">✓ Personal Assistant</div><div class="d">Notes &amp; to-dos.</div></div>
+          <div class="card"><div class="t">⑂ GitHub</div><div class="d">Repos, issues &amp; PRs.</div></div>
+          <div class="card"><div class="t">$ FinOps</div><div class="d">Cost &amp; budgets.</div></div>
+          <div class="card"><div class="t">◈ Research</div><div class="d">Grounded in your KB.</div></div>
+          <div class="card"><div class="t">▤ Data Analyst</div><div class="d">SQL over PostgreSQL.</div></div>
+        </div>
+        <div class="foot"><span>Chat UI</span><span>05</span></div>
+      </section>
+
+      <!-- 6 · Chat UI highlights -->
+      <section class="slide">
+        <div class="kicker">The front end</div>
+        <h2>A chat UI that <span class="grad">means business</span></h2>
+        <div class="grid g2">
+          <ul class="feat">
+            <li><b>Multi-provider models&nbsp;</b><span>— Azure OpenAI, OpenAI, Anthropic, local — auto-discovered.</span></li>
+            <li><b>Auto router&nbsp;</b><span>— cheap model for simple prompts, powerful for complex.</span></li>
+            <li><b>Usage &amp; cost footer&nbsp;</b><span>— per-turn tokens and price, overridable.</span></li>
+            <li><b>Tool approval&nbsp;</b><span>— mutating tools pause for a confirmation.</span></li>
+          </ul>
+          <ul class="feat">
+            <li><b>Projects&nbsp;</b><span>— group chats, shared instructions, drag-reorder, file grounding.</span></li>
+            <li><b>Artifacts&nbsp;</b><span>— syntax highlight, SVG/JSON/HTML preview, zip download.</span></li>
+            <li><b>⌘K palette&nbsp;</b><span>— jump between chats or run any action.</span></li>
+            <li><b>Health panel&nbsp;</b><span>— live online/offline dots per MCP server.</span></li>
+          </ul>
+        </div>
+        <div class="foot"><span>Chat UI</span><span>06</span></div>
+      </section>
+
+      <!-- 7 · Knowledge pipeline -->
+      <section class="slide">
+        <div class="kicker">Retrieval-augmented</div>
+        <h2>Ground answers in <span class="grad">your knowledge</span></h2>
+        <p class="lead" style="margin-bottom: 30px">
+          Upload files to a Project, ingest them into Azure AI Search, and every chat in that
+          project retrieves and cites them — with deletes that propagate back out.
+        </p>
+        <div class="flow">
+          <div class="card step"><div class="t" style="justify-content:center">📄 Upload</div><div class="d">Project files</div></div>
+          <div class="arrow">→</div>
+          <div class="card step"><div class="t" style="justify-content:center">✂️ Chunk</div><div class="d">Stable passages</div></div>
+          <div class="arrow">→</div>
+          <div class="card step"><div class="t" style="justify-content:center">◈ Ingest</div><div class="d">AI Search index</div></div>
+          <div class="arrow">→</div>
+          <div class="card step"><div class="t" style="justify-content:center">🔍 Retrieve</div><div class="d">Cited answers</div></div>
+        </div>
+        <div class="foot"><span>Knowledge</span><span>07</span></div>
+      </section>
+
+      <!-- 8 · Security & identity -->
+      <section class="slide">
+        <div class="kicker">Trust boundaries</div>
+        <h2>Four identities, <span class="grad">zero shared secrets</span></h2>
+        <div class="grid g4">
+          <div class="card"><div class="t"><span class="ico">🔐</span></div><div class="t">Easy Auth</div><div class="d">Users → chat-ui via Entra sign-in.</div></div>
+          <div class="card"><div class="t"><span class="ico">🔑</span></div><div class="t">API keys</div><div class="d">chat-ui → model providers.</div></div>
+          <div class="card"><div class="t"><span class="ico">🪪</span></div><div class="t">Managed identity</div><div class="d">AzLens → Azure via DefaultAzureCredential.</div></div>
+          <div class="card"><div class="t"><span class="ico">🤝</span></div><div class="t">OIDC federation</div><div class="d">GitHub → Azure, no stored creds.</div></div>
+        </div>
+        <ul class="feat" style="margin-top: 26px">
+          <li><b>Key Vault by default&nbsp;</b><span>— secrets never live in app config.</span></li>
+          <li><b>Internal MCP ingress&nbsp;</b><span>— only chat-ui is publicly exposed.</span></li>
+        </ul>
+        <div class="foot"><span>Security</span><span>08</span></div>
+      </section>
+
+      <!-- 9 · Quality -->
+      <section class="slide">
+        <div class="kicker">Engineered to last</div>
+        <h2>Quality is <span class="grad">built in</span></h2>
+        <div class="grid g4">
+          <div class="card stat"><div class="n">Vitest</div><div class="l">Unit tests</div></div>
+          <div class="card stat"><div class="n">Playwright</div><div class="l">E2E flows</div></div>
+          <div class="card stat"><div class="n">OIDC</div><div class="l">GitHub Actions CI/CD</div></div>
+          <div class="card stat"><div class="n">Redis</div><div class="l">Rate limiting</div></div>
+        </div>
+        <ul class="feat" style="margin-top: 26px">
+          <li><b>Typed end-to-end&nbsp;</b><span>— strict TypeScript across servers and UI.</span></li>
+          <li><b>Cosmos persistence&nbsp;</b><span>— conversations &amp; projects sync across devices.</span></li>
+          <li><b>Single-replica hardening&nbsp;</b><span>— safe defaults for stateful transports.</span></li>
+        </ul>
+        <div class="foot"><span>Quality</span><span>09</span></div>
+      </section>
+
+      <!-- 10 · Tech stack -->
+      <section class="slide">
+        <div class="kicker">Under the hood</div>
+        <h2>The <span class="grad">stack</span></h2>
+        <div class="grid g3">
+          <div class="card"><div class="t">Frontend</div><div class="d"><span class="chip">Next.js 14</span><span class="chip">React</span><span class="chip">AI SDK</span><span class="chip">TypeScript</span></div></div>
+          <div class="card"><div class="t">Servers</div><div class="d"><span class="chip">MCP SDK</span><span class="chip">Express</span><span class="chip">Node</span><span class="chip">Zod</span></div></div>
+          <div class="card"><div class="t">Azure</div><div class="d"><span class="chip">Container Apps</span><span class="chip">Cosmos DB</span><span class="chip">Key Vault</span><span class="chip">AI Search</span></div></div>
+          <div class="card"><div class="t">Models</div><div class="d"><span class="chip">Azure OpenAI</span><span class="chip">OpenAI</span><span class="chip">Anthropic</span><span class="chip">Local</span></div></div>
+          <div class="card"><div class="t">Data</div><div class="d"><span class="chip">PostgreSQL</span><span class="chip">Redis</span><span class="chip">KQL</span></div></div>
+          <div class="card"><div class="t">DevOps</div><div class="d"><span class="chip">GitHub Actions</span><span class="chip">ACR</span><span class="chip">Bicep/IaC</span></div></div>
+        </div>
+        <div class="foot"><span>Tech</span><span>10</span></div>
+      </section>
+
+      <!-- 11 · Close -->
+      <section class="slide" style="align-items:flex-start">
+        <div class="logo"><span class="dot"></span> AzLens</div>
+        <h1 style="margin-top: 34px">See more,<br /><span class="grad">ship faster.</span></h1>
+        <p class="lead">
+          Seven focused tools, eight sharp agents, one beautiful interface — grounded in your
+          data and deployed the Azure-native way.
+        </p>
+        <div class="title-badges">
+          <span class="chip">github.com/mimuruth/AzLens</span>
+          <span class="chip">MIT</span>
+        </div>
+        <div class="foot"><span>Thank you</span><span>11</span></div>
+      </section>
+    </div>
+
+    <div class="counter" id="counter">01 / 11</div>
+    <div class="dots" id="dots"></div>
+    <div class="nav">
+      <button id="prev" aria-label="Previous slide">‹</button>
+      <button id="next" aria-label="Next slide">›</button>
+    </div>
+
+    <script>
+      (function () {
+        const slides = Array.from(document.querySelectorAll(".slide"));
+        const total = slides.length;
+        const progress = document.getElementById("progress");
+        const counter = document.getElementById("counter");
+        const dotsWrap = document.getElementById("dots");
+        let i = 0;
+
+        slides.forEach((_, idx) => {
+          const d = document.createElement("i");
+          d.addEventListener("click", () => go(idx));
+          dotsWrap.appendChild(d);
+        });
+        const dots = Array.from(dotsWrap.children);
+
+        function pad(n) {
+          return String(n + 1).padStart(2, "0");
+        }
+        function render() {
+          slides.forEach((s, idx) => s.classList.toggle("active", idx === i));
+          dots.forEach((d, idx) => d.classList.toggle("on", idx === i));
+          progress.style.width = ((i + 1) / total) * 100 + "%";
+          counter.textContent = pad(i) + " / " + String(total).padStart(2, "0");
+          location.hash = "s" + (i + 1);
+        }
+        function go(n) {
+          i = Math.max(0, Math.min(total - 1, n));
+          render();
+        }
+        function next() { go(i + 1); }
+        function prev() { go(i - 1); }
+
+        document.getElementById("next").addEventListener("click", next);
+        document.getElementById("prev").addEventListener("click", prev);
+
+        document.addEventListener("keydown", (e) => {
+          if (["ArrowRight", "ArrowDown", " ", "PageDown"].includes(e.key)) { e.preventDefault(); next(); }
+          else if (["ArrowLeft", "ArrowUp", "PageUp"].includes(e.key)) { e.preventDefault(); prev(); }
+          else if (e.key === "Home") go(0);
+          else if (e.key === "End") go(total - 1);
+          else if (e.key.toLowerCase() === "f") {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+            else document.exitFullscreen();
+          }
+        });
+
+        // Touch / swipe
+        let x0 = null;
+        addEventListener("touchstart", (e) => (x0 = e.touches[0].clientX), { passive: true });
+        addEventListener("touchend", (e) => {
+          if (x0 === null) return;
+          const dx = e.changedTouches[0].clientX - x0;
+          if (Math.abs(dx) > 50) (dx < 0 ? next : prev)();
+          x0 = null;
+        });
+
+        // Deep link on load
+        const m = /s(\d+)/.exec(location.hash);
+        if (m) i = Math.max(0, Math.min(total - 1, parseInt(m[1], 10) - 1));
+        render();
+      })();
+    </script>
+  </body>
+</html>
