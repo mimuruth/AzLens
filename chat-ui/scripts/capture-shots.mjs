@@ -138,10 +138,9 @@ const main = async () => {
   await shot(page, "chat-ui-rail.png");
   await page.getByRole("button", { name: /Toggle sidebar/i }).click();
 
-  // 6) Light mode, multi-chat.
-  await page.evaluate(() => localStorage.setItem("azlens.theme", "light"));
-  await page.reload({ waitUntil: "networkidle" });
-  await page.waitForSelector(".markdown table", { timeout: 15000 });
+  // 6) Light mode, multi-chat. Toggle via the UI (a reload would re-apply the
+  // seed's dark theme through addInitScript).
+  await page.getByRole("button", { name: "Light mode" }).first().click();
   await page.waitForTimeout(500);
   await shot(page, "chat-ui-multichat.png");
 
