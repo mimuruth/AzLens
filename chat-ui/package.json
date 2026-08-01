@@ -10,6 +10,7 @@
     "start": "next start -p 3000",
     "lint": "next lint",
     "test": "vitest run",
+    "eval": "vitest run lib/__tests__/router-eval.test.ts",
     "e2e": "playwright test"
   },
   "engines": {

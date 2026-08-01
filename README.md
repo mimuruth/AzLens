@@ -241,6 +241,13 @@ npm install && npm test
 
 These run automatically in CI alongside each project's build.
 
+It also ships a deterministic **router eval harness** — a labeled prompt dataset scored against the complexity router, reporting accuracy plus per-class precision/recall/F1 and listing every misroute. It runs as a Vitest regression gate (part of `npm test`) and standalone via `npm run eval`; grow the dataset in [chat-ui/lib/eval/router-cases.ts](chat-ui/lib/eval/router-cases.ts).
+
+```bash
+cd chat-ui
+npm run eval
+```
+
 The chat-ui also ships **Playwright** end-to-end tests for UI flows that need no model key — greeting, new chat, command palette, per-conversation instructions, composer mode chips, the Artifacts panel, creating/opening a Project, and knowledge-base ingestion (with a mocked tool API):
 
 ```bash
