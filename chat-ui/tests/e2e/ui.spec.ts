@@ -162,6 +162,7 @@ test("runs the multi-agent orchestrator (mocked API)", async ({ page }) => {
         agentId: "research",
         agentName: "Research",
         task: "Gather latency facts",
+        at: 0,
       },
       {
         type: "step-done",
@@ -171,6 +172,10 @@ test("runs the multi-agent orchestrator (mocked API)", async ({ page }) => {
           agentName: "Research",
           task: "Gather latency facts",
           output: "West Europe has lower EU latency.",
+          usage: { promptTokens: 20, completionTokens: 10, totalTokens: 30 },
+          cost: 0.001,
+          startedAt: 0,
+          endedAt: 40,
         },
       },
       {
@@ -179,6 +184,7 @@ test("runs the multi-agent orchestrator (mocked API)", async ({ page }) => {
         agentId: "coder",
         agentName: "Code Assistant",
         task: "Write a retry helper",
+        at: 0,
       },
       {
         type: "step-done",
@@ -188,6 +194,10 @@ test("runs the multi-agent orchestrator (mocked API)", async ({ page }) => {
           agentName: "Code Assistant",
           task: "Write a retry helper",
           output: "```ts\nexport const retry = () => {};\n```",
+          usage: { promptTokens: 15, completionTokens: 25, totalTokens: 40 },
+          cost: 0.002,
+          startedAt: 0,
+          endedAt: 50,
         },
       },
       {
@@ -218,5 +228,11 @@ test("runs the multi-agent orchestrator (mocked API)", async ({ page }) => {
   await expect(page.locator(".orchestrator-step")).toHaveCount(2);
   await expect(page.locator(".orchestrator-agent").first()).toHaveText(
     "Research"
+  );
+  // Parallelism timeline with per-step tokens and a total.
+  await expect(page.locator(".orchestrator-timeline")).toBeVisible();
+  await expect(page.locator(".orchestrator-tl-bar")).toHaveCount(2);
+  await expect(page.locator(".orchestrator-timeline")).toContainText(
+    /70 tokens/
   );
 });

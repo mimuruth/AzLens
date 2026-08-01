@@ -1,6 +1,7 @@
 import { generateText } from "ai";
 import { getModel } from "@/lib/model";
 import { getMcpTools } from "@/lib/mcp";
+import { estimateCost } from "@/lib/pricing";
 import { orchestrate, type OrchestratorDeps } from "@/lib/orchestrator";
 import { rateLimit, callerKey } from "@/lib/rate-limit";
 
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
     runAgent: async (agent, task, context) => {
       const { tools, close } = await getMcpTools(agent.servers);
       try {
-        const { text } = await generateText({
+        const { text, usage } = await generateText({
           model,
           system: agent.systemPrompt,
           prompt: context ? `${context}${task}` : task,
@@ -50,7 +51,8 @@ export async function POST(req: Request) {
           maxSteps: 5,
           maxTokens: 900,
         });
-        return text;
+        const modelId = (model as { modelId?: string }).modelId;
+        return { output: text, usage, cost: estimateCost(modelId, usage) };
       } finally {
         await close();
       }

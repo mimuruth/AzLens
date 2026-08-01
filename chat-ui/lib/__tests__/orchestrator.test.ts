@@ -172,6 +172,22 @@ describe("runPlan — parallelism & ordering", () => {
     expect(order).toEqual(["research", "coder"]); // dependency ran first
     expect(sawContext).toContain("[research] find facts");
   });
+
+  it("propagates worker usage/cost and records timing", async () => {
+    const deps: OrchestratorDeps = {
+      generate: async () => "",
+      runAgent: async (agent) => ({
+        output: `[${agent.id}]`,
+        usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+        cost: 0.002,
+      }),
+    };
+    const [r] = await runPlan([{ agentId: "research", task: "t" }], deps);
+    expect(r.usage?.totalTokens).toBe(15);
+    expect(r.cost).toBe(0.002);
+    expect(typeof r.startedAt).toBe("number");
+    expect(r.endedAt).toBeGreaterThanOrEqual(r.startedAt!);
+  });
 });
 
 describe("orchestrate — streaming events", () => {

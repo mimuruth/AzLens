@@ -5,12 +5,21 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 type StepStatus = "running" | "done" | "error";
+type TokenUsage = {
+  promptTokens?: number | null;
+  completionTokens?: number | null;
+  totalTokens?: number | null;
+};
 type StepState = {
   agentName: string;
   task: string;
   status: StepStatus;
   output?: string;
   error?: string;
+  usage?: TokenUsage;
+  cost?: number | null;
+  startedAt?: number;
+  endedAt?: number;
 };
 
 /**
@@ -46,11 +55,16 @@ export default function OrchestratorModal({
     index?: number;
     agentName?: string;
     task?: string;
+    at?: number;
     result?: {
       agentName: string;
       task: string;
       output: string;
       error?: string;
+      usage?: TokenUsage;
+      cost?: number | null;
+      startedAt?: number;
+      endedAt?: number;
     };
     answer?: string;
     error?: string;
@@ -63,6 +77,7 @@ export default function OrchestratorModal({
             agentName: e.agentName!,
             task: e.task!,
             status: "running",
+            startedAt: e.at,
           },
         }));
         break;
@@ -75,6 +90,10 @@ export default function OrchestratorModal({
             status: e.result!.error ? "error" : "done",
             output: e.result!.output,
             error: e.result!.error,
+            usage: e.result!.usage,
+            cost: e.result!.cost,
+            startedAt: e.result!.startedAt,
+            endedAt: e.result!.endedAt,
           },
         }));
         break;
@@ -134,6 +153,31 @@ export default function OrchestratorModal({
   const indices = Object.keys(steps)
     .map(Number)
     .sort((a, b) => a - b);
+
+  const stepTokens = (s: StepState): number | null => {
+    const u = s.usage;
+    if (!u) return null;
+    const t =
+      u.totalTokens ??
+      Number(u.promptTokens ?? 0) + Number(u.completionTokens ?? 0);
+    return t || null;
+  };
+  const fmtCost = (c?: number | null): string | null =>
+    typeof c === "number" ? `$${c < 0.01 ? c.toFixed(4) : c.toFixed(3)}` : null;
+
+  const totals = indices.reduce(
+    (acc, i) => {
+      acc.tokens += stepTokens(steps[i]) ?? 0;
+      if (typeof steps[i].cost === "number")
+        acc.cost += steps[i].cost as number;
+      return acc;
+    },
+    { tokens: 0, cost: 0 }
+  );
+  const timelineEnd = Math.max(
+    1,
+    ...indices.map((i) => steps[i].endedAt ?? steps[i].startedAt ?? 0)
+  );
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -212,6 +256,12 @@ export default function OrchestratorModal({
                           {s.agentName}
                         </span>
                         <span className="orchestrator-task">{s.task}</span>
+                        {stepTokens(s) != null && (
+                          <span className="orchestrator-meta">
+                            {stepTokens(s)!.toLocaleString()} tok
+                            {fmtCost(s.cost) ? ` · ${fmtCost(s.cost)}` : ""}
+                          </span>
+                        )}
                       </button>
                       {open.has(i) && (s.output || s.error) && (
                         <div className="orchestrator-step-body markdown">
@@ -224,6 +274,43 @@ export default function OrchestratorModal({
                           )}
                         </div>
                       )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {indices.some((i) => steps[i].startedAt != null) && (
+              <div className="orchestrator-timeline">
+                <span className="orchestrator-label">
+                  Timeline
+                  {totals.tokens
+                    ? ` · ${totals.tokens.toLocaleString()} tokens${
+                        fmtCost(totals.cost) ? ` · ${fmtCost(totals.cost)}` : ""
+                      }`
+                    : ""}
+                </span>
+                {indices.map((i) => {
+                  const s = steps[i];
+                  const start = s.startedAt ?? 0;
+                  const end = s.endedAt ?? timelineEnd;
+                  const left = (start / timelineEnd) * 100;
+                  const width = Math.max(
+                    2,
+                    ((end - start) / timelineEnd) * 100
+                  );
+                  return (
+                    <div key={i} className="orchestrator-tl-row">
+                      <span className="orchestrator-tl-name">
+                        {s.agentName}
+                      </span>
+                      <span className="orchestrator-tl-track">
+                        <span
+                          className={`orchestrator-tl-bar ${s.status}`}
+                          style={{ left: `${left}%`, width: `${width}%` }}
+                          title={`${Math.round(end - start)} ms`}
+                        />
+                      </span>
                     </div>
                   );
                 })}

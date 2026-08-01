@@ -11,12 +11,22 @@ import { AGENTS, getAgent, type Agent } from "./agents";
  */
 
 export type SubTask = { agentId: string; task: string; dependsOn?: number[] };
+export type TokenUsage = {
+  promptTokens?: number | null;
+  completionTokens?: number | null;
+  totalTokens?: number | null;
+};
 export type SubResult = {
   agentId: string;
   agentName: string;
   task: string;
   output: string;
   error?: string;
+  usage?: TokenUsage;
+  cost?: number | null;
+  /** Milliseconds from orchestration start (for the parallelism timeline). */
+  startedAt?: number;
+  endedAt?: number;
 };
 export type Orchestration = {
   objective: string;
@@ -24,6 +34,10 @@ export type Orchestration = {
   results: SubResult[];
   answer: string;
 };
+
+/** A worker may return plain text or text plus token usage/cost. */
+export type WorkerOutput =
+  string | { output: string; usage?: TokenUsage; cost?: number | null };
 
 /** Streamed progress events (emitted in order the work happens). */
 export type OrchestratorEvent =
@@ -34,6 +48,7 @@ export type OrchestratorEvent =
       agentId: string;
       agentName: string;
       task: string;
+      at: number;
     }
   | { type: "step-done"; index: number; result: SubResult }
   | { type: "answer"; answer: string }
@@ -42,7 +57,11 @@ export type OrchestratorEvent =
 export type OrchestratorDeps = {
   generate: (prompt: string, system?: string) => Promise<string>;
   /** Run a worker; `context` carries the outputs of its dependency steps. */
-  runAgent: (agent: Agent, task: string, context?: string) => Promise<string>;
+  runAgent: (
+    agent: Agent,
+    task: string,
+    context?: string
+  ) => Promise<WorkerOutput>;
   /** Optional progress sink for streaming UIs. */
   onEvent?: (event: OrchestratorEvent) => void;
 };
@@ -196,6 +215,7 @@ export async function runPlan(
   const started = new Array(plan.length).fill(false);
   let done = 0;
   let inFlight = 0;
+  const t0 = Date.now();
 
   const ready = (i: number) =>
     !started[i] &&
@@ -214,27 +234,37 @@ export async function runPlan(
         inFlight++;
         const step = plan[i];
         const agent = getAgent(step.agentId);
+        const startedAt = Date.now() - t0;
         deps.onEvent?.({
           type: "step-start",
           index: i,
           agentId: agent.id,
           agentName: agent.name,
           task: step.task,
+          at: startedAt,
         });
         const ctx = contextFrom(step.dependsOn, results);
         Promise.resolve(deps.runAgent(agent, step.task, ctx || undefined))
-          .then((output) => ({ output }) as { output: string; error?: string })
+          .then((raw) =>
+            typeof raw === "string"
+              ? { output: raw }
+              : { output: raw.output, usage: raw.usage, cost: raw.cost }
+          )
           .catch((e) => ({
             output: "",
             error: e instanceof Error ? e.message : String(e),
           }))
-          .then(({ output, error }) => {
+          .then((r) => {
             const result: SubResult = {
               agentId: agent.id,
               agentName: agent.name,
               task: step.task,
-              output,
-              error,
+              output: (r as { output: string }).output,
+              error: (r as { error?: string }).error,
+              usage: (r as { usage?: TokenUsage }).usage,
+              cost: (r as { cost?: number | null }).cost,
+              startedAt,
+              endedAt: Date.now() - t0,
             };
             results[i] = result;
             inFlight--;
