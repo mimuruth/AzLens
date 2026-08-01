@@ -248,6 +248,13 @@ cd chat-ui
 npm run eval
 ```
 
+An opt-in **response-quality eval** (`npm run eval:llm`) scores a live model's outputs against per-case assertions (contains / regex / JSON shape / min length) and an optional LLM-as-judge. It's kept out of `npm test` (separate `vitest.eval.config.ts`) so CI never calls a real model, and **skips** unless a provider key is configured. Add cases in [chat-ui/lib/eval/response-cases.ts](chat-ui/lib/eval/response-cases.ts).
+
+```bash
+cd chat-ui
+npm run eval:llm       # needs a model provider key in .env.local
+```
+
 The chat-ui also ships **Playwright** end-to-end tests for UI flows that need no model key — greeting, new chat, command palette, per-conversation instructions, composer mode chips, the Artifacts panel, creating/opening a Project, and knowledge-base ingestion (with a mocked tool API):
 
 ```bash
