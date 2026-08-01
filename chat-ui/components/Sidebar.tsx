@@ -267,6 +267,7 @@ export default function Sidebar({
   onRemoveTemplate,
   onOpenArtifacts,
   onOpenProjects,
+  onOpenOrchestrator,
   projects,
   activeProjectId,
   onSelectProject,
@@ -294,6 +295,7 @@ export default function Sidebar({
   onRemoveTemplate: (id: string) => void;
   onOpenArtifacts: () => void;
   onOpenProjects: () => void;
+  onOpenOrchestrator: () => void;
   projects: Project[];
   activeProjectId: string | null;
   onSelectProject: (id: string | null) => void;
@@ -765,6 +767,45 @@ export default function Sidebar({
             </svg>
           </span>
           Artifacts
+        </button>
+
+        <button
+          className="side-entry"
+          onClick={onOpenOrchestrator}
+          title="Orchestrator — plan and delegate across agents"
+        >
+          <span className="side-entry-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <circle
+                cx="12"
+                cy="5"
+                r="2.4"
+                stroke="currentColor"
+                strokeWidth="1.7"
+              />
+              <circle
+                cx="5"
+                cy="18"
+                r="2.4"
+                stroke="currentColor"
+                strokeWidth="1.7"
+              />
+              <circle
+                cx="19"
+                cy="18"
+                r="2.4"
+                stroke="currentColor"
+                strokeWidth="1.7"
+              />
+              <path
+                d="M12 7.4V12M12 12l-5.2 3.8M12 12l5.2 3.8"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+              />
+            </svg>
+          </span>
+          Orchestrator
         </button>
 
         <button

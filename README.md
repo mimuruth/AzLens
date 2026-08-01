@@ -676,6 +676,11 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
   - **Data Analyst** — `mcp-postgres` only (read-only SQL over your database).
 - Add or edit agents in [chat-ui/lib/agents.ts](chat-ui/lib/agents.ts).
 
+**Multi-agent orchestrator**
+
+- The sidebar **Orchestrator** opens a planner → workers → synthesizer flow: a coordinator decomposes an objective into sub-tasks and assigns each to the best-fit specialist agent; every worker runs with **its own scoped MCP tools**; a synthesizer merges the results into one answer, attributing each contribution.
+- The engine ([chat-ui/lib/orchestrator.ts](chat-ui/lib/orchestrator.ts)) takes injectable `generate` / `runAgent` callbacks, so it is fully unit-tested without a live model; the [POST /api/orchestrate](chat-ui/app/api/orchestrate/route.ts) route wires in the real model and per-agent MCP tools. Plan parsing is tolerant of code fences and drops unknown agent ids, falling back to the General agent.
+
 **MCP tools panel**
 
 - Live **health dots** (online / down / off) for each server, polled every 15s via `/api/mcp/health`.

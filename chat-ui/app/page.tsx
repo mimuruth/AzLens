@@ -7,6 +7,7 @@ import ChatArea from "@/components/ChatArea";
 import CommandPalette from "@/components/CommandPalette";
 import ArtifactsPanel from "@/components/ArtifactsPanel";
 import ProjectsModal from "@/components/ProjectsModal";
+import OrchestratorModal from "@/components/OrchestratorModal";
 import {
   type Conversation,
   type Theme,
@@ -78,6 +79,7 @@ export default function Page() {
   const [agentId, setAgentId] = useState<string>(DEFAULT_AGENT_ID);
   const [requireApproval, setRequireApproval] = useState(true);
   const [artifactsOpen, setArtifactsOpen] = useState(false);
+  const [orchestratorOpen, setOrchestratorOpen] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [projectsOpen, setProjectsOpen] = useState(false);
@@ -772,6 +774,7 @@ export default function Page() {
         onRemoveTemplate={removeTemplate}
         onOpenArtifacts={() => setArtifactsOpen(true)}
         onOpenProjects={() => setProjectsOpen(true)}
+        onOpenOrchestrator={() => setOrchestratorOpen(true)}
         projects={projects}
         activeProjectId={activeProjectId}
         onSelectProject={selectProject}
@@ -823,6 +826,9 @@ export default function Page() {
           onRemoveFromIndex={removeProjectFromIndex}
           fileMax={PROJECT_FILE_MAX}
         />
+      )}
+      {orchestratorOpen && (
+        <OrchestratorModal onClose={() => setOrchestratorOpen(false)} />
       )}
       {paletteOpen && (
         <CommandPalette

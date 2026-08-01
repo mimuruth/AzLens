@@ -148,3 +148,52 @@ test("creates the index and ingests project files (mocked tool API)", async ({
   await item.getByRole("button", { name: "Ingest to knowledge base" }).click();
   await expect(item.locator(".project-files-status")).toHaveText(/Ingested/);
 });
+
+test("runs the multi-agent orchestrator (mocked API)", async ({ page }) => {
+  await page.route("**/api/orchestrate", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        objective: "Compare regions and add retries",
+        plan: [
+          { agentId: "research", task: "Gather latency facts" },
+          { agentId: "coder", task: "Write a retry helper" },
+        ],
+        results: [
+          {
+            agentId: "research",
+            agentName: "Research",
+            task: "Gather latency facts",
+            output: "West Europe has lower EU latency.",
+          },
+          {
+            agentId: "coder",
+            agentName: "Code Assistant",
+            task: "Write a retry helper",
+            output: "```ts\nexport const retry = () => {};\n```",
+          },
+        ],
+        answer: "Use West Europe and add exponential backoff retries.",
+      }),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Orchestrator" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Orchestrator" })
+  ).toBeVisible();
+  await page
+    .getByPlaceholder(/the planner splits it across/i)
+    .fill("Compare regions and add retries");
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+
+  await expect(page.locator(".orchestrator-answer")).toContainText(
+    /West Europe/
+  );
+  await expect(page.locator(".orchestrator-step")).toHaveCount(2);
+  await expect(page.locator(".orchestrator-agent").first()).toHaveText(
+    "Research"
+  );
+});
