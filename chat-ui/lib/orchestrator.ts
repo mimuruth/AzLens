@@ -10,7 +10,7 @@ import { AGENTS, getAgent, type Agent } from "./agents";
  * live model, and the API route wires in the real model + MCP tools.
  */
 
-export type SubTask = { agentId: string; task: string };
+export type SubTask = { agentId: string; task: string; dependsOn?: number[] };
 export type SubResult = {
   agentId: string;
   agentName: string;
@@ -25,12 +25,31 @@ export type Orchestration = {
   answer: string;
 };
 
+/** Streamed progress events (emitted in order the work happens). */
+export type OrchestratorEvent =
+  | { type: "plan"; plan: SubTask[] }
+  | {
+      type: "step-start";
+      index: number;
+      agentId: string;
+      agentName: string;
+      task: string;
+    }
+  | { type: "step-done"; index: number; result: SubResult }
+  | { type: "answer"; answer: string }
+  | { type: "error"; error: string };
+
 export type OrchestratorDeps = {
   generate: (prompt: string, system?: string) => Promise<string>;
-  runAgent: (agent: Agent, task: string) => Promise<string>;
+  /** Run a worker; `context` carries the outputs of its dependency steps. */
+  runAgent: (agent: Agent, task: string, context?: string) => Promise<string>;
+  /** Optional progress sink for streaming UIs. */
+  onEvent?: (event: OrchestratorEvent) => void;
 };
 
 export const MAX_SUBTASKS = 5;
+/** Cap on workers running at once (independent sub-tasks fan out in parallel). */
+export const MAX_CONCURRENCY = 3;
 
 const VALID_IDS = new Set(AGENTS.map((a) => a.id));
 
@@ -55,9 +74,10 @@ export function buildPlannerPrompt(objective: string): string {
     roster,
     "",
     `Decompose the objective into 1–${MAX_SUBTASKS} sub-tasks. Assign each to `,
-    "the best-fit agent by its id. Order them so earlier results inform later ",
-    "ones. Respond with ONLY a JSON array, e.g.:",
-    '[{"agentId":"research","task":"..."},{"agentId":"coder","task":"..."}]',
+    "the best-fit agent by its id. Independent sub-tasks run in parallel; if a ",
+    'sub-task needs an earlier one\'s output, list those positions in "dependsOn" ',
+    "(0-based indices into this array). Respond with ONLY a JSON array, e.g.:",
+    '[{"agentId":"research","task":"..."},{"agentId":"coder","task":"...","dependsOn":[0]}]',
   ].join("\n");
 }
 
@@ -81,10 +101,29 @@ export function parsePlan(raw: string): SubTask[] {
     ).trim();
     const task = String((item as { task?: unknown }).task ?? "").trim();
     if (!task || !VALID_IDS.has(agentId)) continue;
-    out.push({ agentId, task });
+    const rawDeps = (item as { dependsOn?: unknown }).dependsOn;
+    const dependsOn = Array.isArray(rawDeps)
+      ? rawDeps
+          .map((n) => Math.trunc(Number(n)))
+          .filter((n) => Number.isFinite(n))
+      : undefined;
+    out.push(
+      dependsOn && dependsOn.length
+        ? { agentId, task, dependsOn }
+        : { agentId, task }
+    );
     if (out.length >= MAX_SUBTASKS) break;
   }
-  return out;
+  // Keep only dependency indices that point at valid earlier-or-other tasks.
+  return out.map((t) => {
+    if (!t.dependsOn) return t;
+    const deps = [...new Set(t.dependsOn)].filter(
+      (i) => i >= 0 && i < out.length && i !== out.indexOf(t)
+    );
+    return deps.length
+      ? { ...t, dependsOn: deps }
+      : { agentId: t.agentId, task: t.task };
+  });
 }
 
 export async function planTasks(
@@ -128,35 +167,112 @@ export function buildSynthesisPrompt(
   ].join("\n");
 }
 
+/** Concatenate dependency outputs into a context block for a dependent worker. */
+function contextFrom(
+  deps: number[] | undefined,
+  results: (SubResult | undefined)[]
+): string {
+  if (!deps?.length) return "";
+  const blocks = deps
+    .map((i) => results[i])
+    .filter((r): r is SubResult => Boolean(r) && !r!.error)
+    .map((r) => `From ${r.agentName} — ${r.task}:\n${r.output}`);
+  return blocks.length
+    ? `Context from earlier steps:\n\n${blocks.join("\n\n")}\n\n`
+    : "";
+}
+
+/**
+ * Run the plan respecting `dependsOn`: any sub-task whose dependencies are all
+ * done becomes runnable, and runnable tasks execute in parallel up to
+ * MAX_CONCURRENCY. Results are returned in plan order.
+ */
+export async function runPlan(
+  plan: SubTask[],
+  deps: OrchestratorDeps,
+  maxConcurrency = MAX_CONCURRENCY
+): Promise<SubResult[]> {
+  const results: (SubResult | undefined)[] = new Array(plan.length);
+  const started = new Array(plan.length).fill(false);
+  let done = 0;
+  let inFlight = 0;
+
+  const ready = (i: number) =>
+    !started[i] &&
+    (plan[i].dependsOn ?? []).every((d) => results[d] !== undefined);
+
+  return new Promise<SubResult[]>((resolve, reject) => {
+    const pump = () => {
+      if (done === plan.length) {
+        resolve(results.map((r) => r as SubResult));
+        return;
+      }
+      for (let i = 0; i < plan.length && inFlight < maxConcurrency; i++) {
+        if (!ready(i)) continue;
+        // Break a dependency deadlock (e.g. a cycle) by ignoring unmet deps.
+        started[i] = true;
+        inFlight++;
+        const step = plan[i];
+        const agent = getAgent(step.agentId);
+        deps.onEvent?.({
+          type: "step-start",
+          index: i,
+          agentId: agent.id,
+          agentName: agent.name,
+          task: step.task,
+        });
+        const ctx = contextFrom(step.dependsOn, results);
+        Promise.resolve(deps.runAgent(agent, step.task, ctx || undefined))
+          .then((output) => ({ output }) as { output: string; error?: string })
+          .catch((e) => ({
+            output: "",
+            error: e instanceof Error ? e.message : String(e),
+          }))
+          .then(({ output, error }) => {
+            const result: SubResult = {
+              agentId: agent.id,
+              agentName: agent.name,
+              task: step.task,
+              output,
+              error,
+            };
+            results[i] = result;
+            inFlight--;
+            done++;
+            deps.onEvent?.({ type: "step-done", index: i, result });
+            pump();
+          });
+      }
+      // Deadlock guard: nothing running and nothing ready but work remains.
+      if (inFlight === 0 && done < plan.length) {
+        const next = started.findIndex((s) => !s);
+        if (next !== -1) {
+          plan[next] = { agentId: plan[next].agentId, task: plan[next].task };
+          pump();
+        } else {
+          reject(
+            new Error("Orchestrator stalled with unresolved dependencies.")
+          );
+        }
+      }
+    };
+    pump();
+  });
+}
+
 export async function orchestrate(
   objective: string,
   deps: OrchestratorDeps
 ): Promise<Orchestration> {
   const plan = await planTasks(objective, deps);
-  const results: SubResult[] = [];
-  for (const step of plan) {
-    const agent = getAgent(step.agentId);
-    try {
-      const output = await deps.runAgent(agent, step.task);
-      results.push({
-        agentId: agent.id,
-        agentName: agent.name,
-        task: step.task,
-        output,
-      });
-    } catch (e) {
-      results.push({
-        agentId: agent.id,
-        agentName: agent.name,
-        task: step.task,
-        output: "",
-        error: e instanceof Error ? e.message : String(e),
-      });
-    }
-  }
+  deps.onEvent?.({ type: "plan", plan });
+
+  const results = await runPlan(plan, deps);
+
   const answer = await deps.generate(
     buildSynthesisPrompt(objective, results),
     SYNTH_SYSTEM
   );
+  deps.onEvent?.({ type: "answer", answer });
   return { objective, plan, results, answer };
 }

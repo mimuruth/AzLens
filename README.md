@@ -679,7 +679,9 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 **Multi-agent orchestrator**
 
 - The sidebar **Orchestrator** opens a planner → workers → synthesizer flow: a coordinator decomposes an objective into sub-tasks and assigns each to the best-fit specialist agent; every worker runs with **its own scoped MCP tools**; a synthesizer merges the results into one answer, attributing each contribution.
-- The engine ([chat-ui/lib/orchestrator.ts](chat-ui/lib/orchestrator.ts)) takes injectable `generate` / `runAgent` callbacks, so it is fully unit-tested without a live model; the [POST /api/orchestrate](chat-ui/app/api/orchestrate/route.ts) route wires in the real model and per-agent MCP tools. Plan parsing is tolerant of code fences and drops unknown agent ids, falling back to the General agent.
+- **Parallel by dependency** — the planner can mark `dependsOn` between sub-tasks; independent ones **fan out in parallel** (bounded concurrency) while dependents receive their predecessors' output as context.
+- **Live progress** — [POST /api/orchestrate](chat-ui/app/api/orchestrate/route.ts) streams newline-delimited events (`plan` → `step-start`/`step-done` → `answer`) so the modal shows each agent running and completing in real time.
+- The engine ([chat-ui/lib/orchestrator.ts](chat-ui/lib/orchestrator.ts)) takes injectable `generate` / `runAgent` callbacks and an `onEvent` sink, so it is fully unit-tested without a live model. Plan parsing is tolerant of code fences, drops unknown agent ids and invalid dependencies, and breaks dependency cycles.
 
 **MCP tools panel**
 

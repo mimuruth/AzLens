@@ -39,13 +39,13 @@ export async function POST(req: Request) {
       });
       return text;
     },
-    runAgent: async (agent, task) => {
+    runAgent: async (agent, task, context) => {
       const { tools, close } = await getMcpTools(agent.servers);
       try {
         const { text } = await generateText({
           model,
           system: agent.systemPrompt,
-          prompt: task,
+          prompt: context ? `${context}${task}` : task,
           tools,
           maxSteps: 5,
           maxTokens: 900,
@@ -57,13 +57,30 @@ export async function POST(req: Request) {
     },
   };
 
-  try {
-    const result = await orchestrate(objective.trim(), deps);
-    return Response.json(result);
-  } catch (e) {
-    return Response.json(
-      { error: e instanceof Error ? e.message : String(e) },
-      { status: 500 }
-    );
-  }
+  // Stream progress as newline-delimited JSON (plan → step-start/done → answer).
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const enc = new TextEncoder();
+      const emit = (e: unknown) =>
+        controller.enqueue(enc.encode(JSON.stringify(e) + "\n"));
+      deps.onEvent = emit;
+      try {
+        await orchestrate(objective.trim(), deps);
+      } catch (e) {
+        emit({
+          type: "error",
+          error: e instanceof Error ? e.message : String(e),
+        });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "content-type": "application/x-ndjson; charset=utf-8",
+      "cache-control": "no-store",
+    },
+  });
 }

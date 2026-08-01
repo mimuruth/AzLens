@@ -3,9 +3,11 @@ import {
   parsePlan,
   planTasks,
   orchestrate,
+  runPlan,
   buildPlannerPrompt,
   MAX_SUBTASKS,
   type OrchestratorDeps,
+  type OrchestratorEvent,
 } from "../orchestrator";
 
 const plannerJson = JSON.stringify([
@@ -100,5 +102,92 @@ describe("buildPlannerPrompt", () => {
     expect(p).toContain("research:");
     expect(p).toContain("coder:");
     expect(p).not.toMatch(/^- general:/m);
+  });
+});
+
+describe("parsePlan — dependencies", () => {
+  it("keeps valid dependsOn indices", () => {
+    const raw = JSON.stringify([
+      { agentId: "research", task: "gather" },
+      { agentId: "coder", task: "build", dependsOn: [0] },
+    ]);
+    expect(parsePlan(raw)[1].dependsOn).toEqual([0]);
+  });
+
+  it("drops out-of-range and self dependencies", () => {
+    const raw = JSON.stringify([
+      { agentId: "research", task: "a", dependsOn: [0, 5] },
+      { agentId: "coder", task: "b", dependsOn: [0] },
+    ]);
+    const plan = parsePlan(raw);
+    expect(plan[0].dependsOn).toBeUndefined(); // self(0) + out-of-range(5) removed
+    expect(plan[1].dependsOn).toEqual([0]);
+  });
+});
+
+describe("runPlan — parallelism & ordering", () => {
+  it("runs independent tasks concurrently and preserves plan order in results", async () => {
+    let active = 0;
+    let peak = 0;
+    const deps: OrchestratorDeps = {
+      generate: async () => "",
+      runAgent: async (agent) => {
+        active++;
+        peak = Math.max(peak, active);
+        await new Promise((r) => setTimeout(r, 10));
+        active--;
+        return `[${agent.id}]`;
+      },
+    };
+    const plan = [
+      { agentId: "research", task: "a" },
+      { agentId: "coder", task: "b" },
+      { agentId: "cost", task: "c" },
+    ];
+    const results = await runPlan(plan, deps);
+    expect(results.map((r) => r.agentId)).toEqual([
+      "research",
+      "coder",
+      "cost",
+    ]);
+    expect(peak).toBeGreaterThan(1); // ran in parallel
+  });
+
+  it("respects dependencies and passes predecessor output as context", async () => {
+    const order: string[] = [];
+    let sawContext = "";
+    const deps: OrchestratorDeps = {
+      generate: async () => "",
+      runAgent: async (agent, task, context) => {
+        order.push(agent.id);
+        if (agent.id === "coder") sawContext = context ?? "";
+        return `[${agent.id}] ${task}`;
+      },
+    };
+    const plan = [
+      { agentId: "research", task: "find facts" },
+      { agentId: "coder", task: "use them", dependsOn: [0] },
+    ];
+    await runPlan(plan, deps);
+    expect(order).toEqual(["research", "coder"]); // dependency ran first
+    expect(sawContext).toContain("[research] find facts");
+  });
+});
+
+describe("orchestrate — streaming events", () => {
+  it("emits plan, step-start/done for each task, and answer", async () => {
+    const events: OrchestratorEvent[] = [];
+    const deps: OrchestratorDeps = {
+      generate: async (prompt) =>
+        prompt.includes("Decompose the objective") ? plannerJson : "FINAL",
+      runAgent: async (agent) => `[${agent.id}]`,
+      onEvent: (e) => events.push(e),
+    };
+    await orchestrate("obj", deps);
+    const types = events.map((e) => e.type);
+    expect(types[0]).toBe("plan");
+    expect(types.filter((t) => t === "step-start")).toHaveLength(2);
+    expect(types.filter((t) => t === "step-done")).toHaveLength(2);
+    expect(types[types.length - 1]).toBe("answer");
   });
 });

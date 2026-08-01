@@ -151,31 +151,54 @@ test("creates the index and ingests project files (mocked tool API)", async ({
 
 test("runs the multi-agent orchestrator (mocked API)", async ({ page }) => {
   await page.route("**/api/orchestrate", async (route) => {
+    const events = [
+      {
+        type: "plan",
+        plan: [{ agentId: "research", task: "Gather latency facts" }],
+      },
+      {
+        type: "step-start",
+        index: 0,
+        agentId: "research",
+        agentName: "Research",
+        task: "Gather latency facts",
+      },
+      {
+        type: "step-done",
+        index: 0,
+        result: {
+          agentId: "research",
+          agentName: "Research",
+          task: "Gather latency facts",
+          output: "West Europe has lower EU latency.",
+        },
+      },
+      {
+        type: "step-start",
+        index: 1,
+        agentId: "coder",
+        agentName: "Code Assistant",
+        task: "Write a retry helper",
+      },
+      {
+        type: "step-done",
+        index: 1,
+        result: {
+          agentId: "coder",
+          agentName: "Code Assistant",
+          task: "Write a retry helper",
+          output: "```ts\nexport const retry = () => {};\n```",
+        },
+      },
+      {
+        type: "answer",
+        answer: "Use West Europe and add exponential backoff retries.",
+      },
+    ];
     await route.fulfill({
       status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        objective: "Compare regions and add retries",
-        plan: [
-          { agentId: "research", task: "Gather latency facts" },
-          { agentId: "coder", task: "Write a retry helper" },
-        ],
-        results: [
-          {
-            agentId: "research",
-            agentName: "Research",
-            task: "Gather latency facts",
-            output: "West Europe has lower EU latency.",
-          },
-          {
-            agentId: "coder",
-            agentName: "Code Assistant",
-            task: "Write a retry helper",
-            output: "```ts\nexport const retry = () => {};\n```",
-          },
-        ],
-        answer: "Use West Europe and add exponential backoff retries.",
-      }),
+      contentType: "application/x-ndjson",
+      body: events.map((e) => JSON.stringify(e)).join("\n") + "\n",
     });
   });
 

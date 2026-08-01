@@ -2046,6 +2046,32 @@ code {
   padding-top: 14px;
 }
 
+.orchestrator-status {
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.orchestrator-status.running {
+  color: var(--accent);
+  display: inline-block;
+  animation: orch-spin 1s linear infinite;
+}
+
+.orchestrator-status.done {
+  color: #16a34a;
+}
+
+.orchestrator-status.error {
+  color: #dc2626;
+}
+
+@keyframes orch-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .projects-modal-head {
   display: flex;
   align-items: center;
