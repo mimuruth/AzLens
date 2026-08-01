@@ -2624,6 +2624,11 @@ code {
   color: var(--accent);
 }
 
+.msg-action.rated {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
 /* ---- Inline edit box ---- */
 .edit-box {
   display: flex;

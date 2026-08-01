@@ -236,3 +236,51 @@ test("runs the multi-agent orchestrator (mocked API)", async ({ page }) => {
     /70 tokens/
   );
 });
+
+test("captures thumbs feedback on an assistant message (mocked API)", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "azlens.conversations",
+      JSON.stringify([
+        {
+          id: "c-fb",
+          title: "Feedback demo",
+          updatedAt: Date.now(),
+          renamed: true,
+        },
+      ])
+    );
+    localStorage.setItem("azlens.active", "c-fb");
+    localStorage.setItem(
+      "azlens.messages.c-fb",
+      JSON.stringify([
+        { id: "u1", role: "user", parts: [{ type: "text", text: "Hi" }] },
+        {
+          id: "a1",
+          role: "assistant",
+          parts: [{ type: "text", text: "Hello there!" }],
+        },
+      ])
+    );
+  });
+
+  let posted: { rating?: string } | null = null;
+  await page.route("**/api/feedback", async (route) => {
+    posted = route.request().postDataJSON();
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true }),
+    });
+  });
+
+  await page.goto("/");
+  await page.locator(".msg.assistant").first().hover();
+  const up = page.getByRole("button", { name: "Thumbs up" });
+  await up.click();
+  await expect(up).toHaveClass(/rated/);
+  expect(posted).not.toBeNull();
+  expect(posted!.rating).toBe("up");
+});

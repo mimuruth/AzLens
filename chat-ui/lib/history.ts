@@ -47,7 +47,7 @@ export async function listConversations(
     .query<ConversationMeta>({
       query:
         "SELECT c.id, c.title, c.updatedAt, c.renamed, c.pinned, c.agentId, c.model, c.projectId " +
-        "FROM c WHERE c.userId = @u AND (NOT IS_DEFINED(c.docType) OR c.docType != 'project') " +
+        "FROM c WHERE c.userId = @u AND NOT IS_DEFINED(c.docType) " +
         "ORDER BY c.updatedAt DESC",
       parameters: [{ name: "@u", value: userId }],
     })
@@ -154,4 +154,33 @@ export async function deleteProject(userId: string, id: string): Promise<void> {
   } catch {
     /* already gone */
   }
+}
+
+// ---- Message feedback (same container, docType='feedback') ------------------
+
+export type StoredFeedback = {
+  id: string;
+  userId: string;
+  docType: "feedback";
+  convoId: string;
+  messageId: string;
+  rating: "up" | "down";
+  reason?: string;
+  createdAt: number;
+};
+
+export async function upsertFeedback(
+  userId: string,
+  fb: Omit<StoredFeedback, "userId" | "docType" | "id" | "createdAt">
+): Promise<void> {
+  const container = await getContainer();
+  if (!container) return;
+  const doc: StoredFeedback = {
+    ...fb,
+    id: `fb:${fb.messageId}`,
+    userId,
+    docType: "feedback",
+    createdAt: Date.now(),
+  };
+  await container.items.upsert(doc);
 }

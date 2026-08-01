@@ -15,6 +15,7 @@ import {
 import { estimateCost } from "@/lib/pricing";
 import { recordChatTurn } from "@/lib/telemetry-events";
 import { rateLimit, callerKey } from "@/lib/rate-limit";
+import { moderateText } from "@/lib/safety";
 
 // The MCP client uses Node APIs, so this route must run on the Node.js runtime.
 export const runtime = "nodejs";
@@ -100,6 +101,17 @@ export async function POST(req: Request) {
     }
     chosen = { provider: decision.provider, model: decision.model };
     routed = { tier: decision.tier, reason: decision.reason };
+  }
+
+  // Guardrail: moderate the latest user message before doing any work.
+  const moderation = await moderateText(
+    lastUserText(coreMessages as CoreMessage[])
+  );
+  if (!moderation.allowed) {
+    return new Response(
+      `This request was blocked by the safety filter (${moderation.categories.join(", ")}). Please rephrase and try again.`,
+      { status: 400 }
+    );
   }
 
   const { tools, close } = await getMcpTools(agent.servers, {

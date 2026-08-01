@@ -294,6 +294,26 @@ export function saveActiveProject(id: string | null): void {
   else localStorage.removeItem(ACTIVE_PROJECT_KEY);
 }
 
+// ---- Message feedback (👍/👎, mirrored to Cosmos when configured) -----------
+
+export type Rating = "up" | "down";
+export type Feedback = { rating: Rating; reason?: string };
+
+const FEEDBACK_KEY = "azlens.feedback";
+
+export function loadFeedback(): Record<string, Feedback> {
+  if (!hasWindow()) return {};
+  try {
+    return JSON.parse(localStorage.getItem(FEEDBACK_KEY) ?? "{}");
+  } catch {
+    return {};
+  }
+}
+
+export function saveFeedbackLocal(map: Record<string, Feedback>): void {
+  if (hasWindow()) localStorage.setItem(FEEDBACK_KEY, JSON.stringify(map));
+}
+
 // ---- Cross-conversation message search -------------------------------------
 
 export type MessageHit = { convoId: string; title: string; snippet: string };

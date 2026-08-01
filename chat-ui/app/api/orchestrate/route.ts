@@ -4,6 +4,7 @@ import { getMcpTools } from "@/lib/mcp";
 import { estimateCost } from "@/lib/pricing";
 import { orchestrate, type OrchestratorDeps } from "@/lib/orchestrator";
 import { rateLimit, callerKey } from "@/lib/rate-limit";
+import { moderateText } from "@/lib/safety";
 
 // Multi-agent orchestration: plan → delegate to scoped agents → synthesize.
 // Uses the MCP client (Node APIs) and may make several model calls, so give it
@@ -26,6 +27,16 @@ export async function POST(req: Request) {
   const { objective } = await req.json().catch(() => ({}));
   if (typeof objective !== "string" || objective.trim().length === 0) {
     return Response.json({ error: "Missing objective." }, { status: 400 });
+  }
+
+  const moderation = await moderateText(objective);
+  if (!moderation.allowed) {
+    return Response.json(
+      {
+        error: `Objective blocked by the safety filter (${moderation.categories.join(", ")}).`,
+      },
+      { status: 400 }
+    );
   }
 
   const model = getModel();

@@ -663,6 +663,14 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 
 - The **Approvals** toggle in the top bar (on by default) requires explicit confirmation before **mutating** tools run — `write_file`, `update_todo_list`, the GitHub writers (`create_issue`, `add_issue_comment`, `create_pull_request`), and the knowledge-base writers (`ingest_documents`, `create_index`, `delete_documents`). When the model calls one, its `execute` is withheld server-side and the UI shows **Approve / Deny**; approving runs it via `POST /api/tool` and the model continues. Turn it off to let tools run automatically. Configure the sensitive-tool list in [chat-ui/lib/tools.ts](chat-ui/lib/tools.ts).
 
+**Guardrails (content safety)**
+
+- User input is **moderated before every turn** (`/api/chat` and `/api/orchestrate`). When `CONTENT_SAFETY_ENDPOINT` is set, it calls **Azure AI Content Safety** for hate/self-harm/sexual/violence categories at a configurable severity threshold; otherwise a local heuristic screens for **prompt-injection** and a few high-signal patterns. Blocked requests return a clear message instead of running. Logic + tests live in [chat-ui/lib/safety.ts](chat-ui/lib/safety.ts).
+
+**Response feedback**
+
+- A **👍 / 👎** on each assistant reply (optional reason on 👎) is stored in `localStorage` and mirrored to Cosmos DB (`docType: "feedback"`) via `POST /api/feedback` when history is enabled — a lightweight data flywheel for evaluation.
+
 **Agents**
 
 - An **agent picker** in the top bar switches between focused personas, each with a tailored system prompt and scoped to a subset of MCP servers:

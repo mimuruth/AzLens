@@ -14,6 +14,10 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import {
   loadMessages,
+  loadFeedback,
+  saveFeedbackLocal,
+  type Feedback,
+  type Rating,
   type ModelProvider,
   type ModelSelection,
   type PromptTemplate,
@@ -301,6 +305,38 @@ export default function ChatArea({
   const [mode, setMode] = useState<string | null>(null);
   modeRef.current = mode;
   const [tplOpen, setTplOpen] = useState(false);
+  const [feedback, setFeedback] = useState<Record<string, Feedback>>({});
+
+  useEffect(() => {
+    setFeedback(loadFeedback());
+  }, []);
+
+  const rate = (message: UIMessage, rating: Rating) => {
+    const existing = feedback[message.id];
+    const cleared = existing?.rating === rating;
+    let reason: string | undefined;
+    if (!cleared && rating === "down") {
+      reason = window.prompt("What was wrong? (optional)") ?? undefined;
+    }
+    setFeedback((prev) => {
+      const next = { ...prev };
+      if (cleared) delete next[message.id];
+      else next[message.id] = { rating, reason };
+      saveFeedbackLocal(next);
+      return next;
+    });
+    if (cleared) return;
+    void fetch("/api/feedback", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        convoId: id,
+        messageId: message.id,
+        rating,
+        reason,
+      }),
+    }).catch(() => {});
+  };
 
   const canSend = input.trim().length > 0 || attachments.length > 0;
 
@@ -778,6 +814,36 @@ export default function ChatArea({
                           >
                             Copy
                           </button>
+                        )}
+                        {message.role === "assistant" && (
+                          <>
+                            <button
+                              type="button"
+                              className={`msg-action ${
+                                feedback[message.id]?.rating === "up"
+                                  ? "rated"
+                                  : ""
+                              }`}
+                              onClick={() => rate(message, "up")}
+                              title="Good response"
+                              aria-label="Thumbs up"
+                            >
+                              👍
+                            </button>
+                            <button
+                              type="button"
+                              className={`msg-action ${
+                                feedback[message.id]?.rating === "down"
+                                  ? "rated"
+                                  : ""
+                              }`}
+                              onClick={() => rate(message, "down")}
+                              title="Bad response"
+                              aria-label="Thumbs down"
+                            >
+                              👎
+                            </button>
+                          </>
                         )}
                         {message.role === "assistant" &&
                           message.id === lastAssistantId &&
