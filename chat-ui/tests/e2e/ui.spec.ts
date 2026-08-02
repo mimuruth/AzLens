@@ -333,3 +333,67 @@ test("shows provider sign-in buttons when unauthenticated (mocked /api/me)", asy
   );
   await expect(page.getByRole("link", { name: "Google" })).toBeVisible();
 });
+
+test("voice: mic and speak controls appear and speak calls the API (stubbed)", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    // Stub Web Speech APIs so the buttons render in headless chromium.
+    // speechSynthesis is a read-only accessor, so define it explicitly.
+    Object.defineProperty(window, "SpeechRecognition", {
+      configurable: true,
+      value: class {
+        start() {}
+        stop() {}
+      },
+    });
+    Object.defineProperty(window, "speechSynthesis", {
+      configurable: true,
+      value: {
+        speak: () => {
+          (window as unknown as Record<string, unknown>).__spoke = true;
+        },
+        cancel: () => {},
+      },
+    });
+    Object.defineProperty(window, "SpeechSynthesisUtterance", {
+      configurable: true,
+      value: class {
+        constructor(public text: string) {}
+      },
+    });
+    localStorage.setItem(
+      "azlens.conversations",
+      JSON.stringify([
+        {
+          id: "c-v",
+          title: "Voice demo",
+          updatedAt: Date.now(),
+          renamed: true,
+        },
+      ])
+    );
+    localStorage.setItem("azlens.active", "c-v");
+    localStorage.setItem(
+      "azlens.messages.c-v",
+      JSON.stringify([
+        { id: "u1", role: "user", parts: [{ type: "text", text: "Hi" }] },
+        {
+          id: "a1",
+          role: "assistant",
+          parts: [{ type: "text", text: "Hello there!" }],
+        },
+      ])
+    );
+  });
+
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: /Dictate/ })).toBeVisible();
+  await page.locator(".msg.assistant").first().hover();
+  await page.getByRole("button", { name: /Speak/ }).click();
+  expect(
+    await page.evaluate(
+      () => (window as unknown as Record<string, unknown>).__spoke
+    )
+  ).toBe(true);
+});

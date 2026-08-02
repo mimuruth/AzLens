@@ -25,6 +25,12 @@ import {
 import { AGENTS } from "@/lib/agents";
 import { isSensitiveTool } from "@/lib/tools";
 import { budgetStatus, formatUsd, SESSION_BUDGET_USD } from "@/lib/budget";
+import {
+  sttSupported,
+  ttsSupported,
+  createRecognition,
+  stripMarkdownForSpeech,
+} from "@/lib/voice";
 import Logo from "@/components/Logo";
 
 type RouteAnnotation = {
@@ -312,6 +318,65 @@ export default function ChatArea({
     setFeedback(loadFeedback());
   }, []);
 
+  // Voice: speech-to-text (mic) and text-to-speech (speak). Feature-detected.
+  const [voice, setVoice] = useState({ stt: false, tts: false });
+  const [listening, setListening] = useState(false);
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    setVoice({ stt: sttSupported(), tts: ttsSupported() });
+    return () => {
+      if (ttsSupported()) window.speechSynthesis.cancel();
+      recognitionRef.current?.stop?.();
+    };
+  }, []);
+
+  const messageToText = (m?: UIMessage) =>
+    (m?.parts ?? [])
+      .filter((p) => p.type === "text")
+      .map((p) => (p as { text: string }).text)
+      .join("\n")
+      .trim();
+
+  const toggleMic = () => {
+    if (!voice.stt) return;
+    if (listening) {
+      recognitionRef.current?.stop?.();
+      return;
+    }
+    const rec = createRecognition();
+    if (!rec) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onresult = (e: any) => {
+      const t = e?.results?.[0]?.[0]?.transcript ?? "";
+      if (t) setInput((prev) => (prev ? `${prev} ${t}` : t));
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    recognitionRef.current = rec;
+    setListening(true);
+    rec.start();
+  };
+
+  const speak = (message: UIMessage) => {
+    if (!voice.tts) return;
+    const synth = window.speechSynthesis;
+    if (speakingId === message.id) {
+      synth.cancel();
+      setSpeakingId(null);
+      return;
+    }
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(
+      stripMarkdownForSpeech(messageToText(message))
+    );
+    u.onend = () => setSpeakingId(null);
+    setSpeakingId(message.id);
+    synth.speak(u);
+  };
+
   const rate = (message: UIMessage, rating: Rating) => {
     const existing = feedback[message.id];
     const cleared = existing?.rating === rating;
@@ -333,12 +398,6 @@ export default function ChatArea({
       idx > 0
         ? [...messages.slice(0, idx)].reverse().find((m) => m.role === "user")
         : undefined;
-    const asText = (m?: UIMessage) =>
-      (m?.parts ?? [])
-        .filter((p) => p.type === "text")
-        .map((p) => (p as { text: string }).text)
-        .join("\n")
-        .trim() || undefined;
     void fetch("/api/feedback", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -347,8 +406,8 @@ export default function ChatArea({
         messageId: message.id,
         rating,
         reason,
-        prompt: asText(prevUser),
-        answer: asText(message),
+        prompt: messageToText(prevUser) || undefined,
+        answer: messageToText(message) || undefined,
       }),
     }).catch(() => {});
   };
@@ -830,6 +889,22 @@ export default function ChatArea({
                             Copy
                           </button>
                         )}
+                        {message.role === "assistant" && voice.tts && (
+                          <button
+                            type="button"
+                            className={`msg-action ${
+                              speakingId === message.id ? "rated" : ""
+                            }`}
+                            onClick={() => speak(message)}
+                            title={
+                              speakingId === message.id
+                                ? "Stop speaking"
+                                : "Read aloud"
+                            }
+                          >
+                            {speakingId === message.id ? "◼ Stop" : "🔊 Speak"}
+                          </button>
+                        )}
                         {message.role === "assistant" && (
                           <>
                             <button
@@ -1063,6 +1138,35 @@ export default function ChatArea({
                 />
               </svg>
             </button>
+            {voice.stt && (
+              <button
+                type="button"
+                className={`attach mic ${listening ? "listening" : ""}`}
+                aria-label={listening ? "Stop dictation" : "Dictate message"}
+                title={
+                  listening ? "Stop dictation" : "Dictate (speech to text)"
+                }
+                onClick={toggleMic}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <rect
+                    x="9"
+                    y="3"
+                    width="6"
+                    height="11"
+                    rx="3"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                  />
+                  <path
+                    d="M5 11a7 7 0 0014 0M12 18v3"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+            )}
             <textarea
               ref={textareaRef}
               className="input"

@@ -2714,6 +2714,22 @@ code {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
+/* ---- Voice: mic dictation button ---- */
+.attach.mic.listening {
+  color: #dc2626;
+  animation: mic-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes mic-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 /* ---- Session cost budget banner ---- */
 .budget-banner {
   margin: 0 auto 6px;
