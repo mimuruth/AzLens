@@ -653,6 +653,7 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 - **Stop** a streaming response, **Regenerate** the last answer, **Copy** any reply, and **Edit & resend** a previous user message (which trims the turns after it).
 - A small footer under each answer shows the agent, model, routed tier, and **token usage with an estimated cost** — using the provider's reported token counts when available, or a labelled `~approx` estimate (characters ÷ 4) otherwise.
 - A **session cost budget** banner warns when the running total of per-turn costs nears (amber) or exceeds (red) a soft budget (`NEXT_PUBLIC_SESSION_BUDGET_USD`, default $1); logic in [chat-ui/lib/budget.ts](chat-ui/lib/budget.ts).
+- **Context-window management** — when a conversation exceeds a token budget (`COMPACT_AT_TOKENS`), the server summarizes the older turns and keeps the most recent verbatim so long chats don't overflow the model's context ([chat-ui/lib/compaction.ts](chat-ui/lib/compaction.ts)).
 - Tool calls render as **collapsible cards** showing the tool name, arguments, and result (click to expand).
 
 **Models & routing**

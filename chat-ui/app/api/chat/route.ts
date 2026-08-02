@@ -1,5 +1,6 @@
 import {
   streamText,
+  generateText,
   convertToCoreMessages,
   createDataStreamResponse,
   type CoreMessage,
@@ -16,6 +17,11 @@ import { estimateCost } from "@/lib/pricing";
 import { recordChatTurn } from "@/lib/telemetry-events";
 import { rateLimit, callerKey } from "@/lib/rate-limit";
 import { moderateText } from "@/lib/safety";
+import {
+  needsCompaction,
+  splitForCompaction,
+  transcript,
+} from "@/lib/compaction";
 
 // The MCP client uses Node APIs, so this route must run on the Node.js runtime.
 export const runtime = "nodejs";
@@ -114,6 +120,33 @@ export async function POST(req: Request) {
     );
   }
 
+  // Context-window management: summarize older turns when the conversation
+  // grows past the token budget, keeping recent turns verbatim.
+  let finalSystem = systemPrompt;
+  let finalMessages = coreMessages as CoreMessage[];
+  const compactAt = Number(process.env.COMPACT_AT_TOKENS ?? 6000);
+  const keepRecent = Number(process.env.COMPACT_KEEP_RECENT ?? 8);
+  if (needsCompaction(finalMessages, compactAt, keepRecent)) {
+    const { older, recent } = splitForCompaction(finalMessages, keepRecent);
+    try {
+      const { text: summary } = await generateText({
+        model: getModel(chosen),
+        temperature: 0,
+        maxTokens: 400,
+        prompt:
+          "Summarize the earlier conversation into concise bullet points " +
+          "capturing key facts, decisions, and context needed to continue. " +
+          `Keep it under 200 words.\n\n${transcript(older)}`,
+      });
+      if (summary.trim()) {
+        finalSystem = `${systemPrompt}\n\nConversation summary so far:\n${summary.trim()}`;
+        finalMessages = recent;
+      }
+    } catch {
+      /* summarization failed — fall back to the full message list */
+    }
+  }
+
   const { tools, close } = await getMcpTools(agent.servers, {
     requireApproval: requireApproval === true,
   });
@@ -133,8 +166,8 @@ export async function POST(req: Request) {
 
       const result = streamText({
         model: getModel(chosen),
-        system: systemPrompt,
-        messages: coreMessages,
+        system: finalSystem,
+        messages: finalMessages,
         tools,
         // Allow the model to call tools and then continue reasoning.
         maxSteps: 5,
