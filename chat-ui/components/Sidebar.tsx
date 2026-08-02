@@ -10,6 +10,7 @@ import {
   groupByDate,
 } from "@/lib/storage";
 import Logo from "@/components/Logo";
+import ProfileChip from "@/components/ProfileChip";
 
 type ServerHealth = { name: string; ok: boolean; configured: boolean };
 
@@ -1201,12 +1202,7 @@ export default function Sidebar({
             </svg>
             Clear all chats
           </button>
-          <div className="user-row">
-            <span className="user-avatar" aria-hidden>
-              U
-            </span>
-            <span>You</span>
-          </div>
+          <ProfileChip />
           <p className="credit">Developed by Michael M</p>
         </div>
       </div>

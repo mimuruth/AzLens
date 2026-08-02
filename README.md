@@ -518,7 +518,7 @@ az role assignment create --assignee "$clientId" --role "Log Analytics Reader" \
   --scope "<log-analytics-workspace-resource-id>"
 ```
 
-**Easy Auth** — once `ENTRA_CLIENT_ID` / `ENTRA_CLIENT_SECRET` are set and the workflow re-runs, visiting the chat-ui URL redirects to Microsoft sign-in.
+**Easy Auth** — once `ENTRA_CLIENT_ID` / `ENTRA_CLIENT_SECRET` are set and the workflow re-runs, visiting the chat-ui URL redirects to Microsoft sign-in. You can add **GitHub** and/or **Google** sign-in the same way with `githubAuthClientId` / `githubAuthClientSecret` and `googleAuthClientId` / `googleAuthClientSecret` Bicep parameters — register an OAuth app with each provider using the callback `https://<chat-ui-url>/.auth/login/<github|google>/callback`. The Bicep enables every configured provider, and when more than one is set it shows a provider chooser (the app also renders per-provider **Sign in** buttons via `AUTH_PROVIDERS`). See [Authentication & multi-user](#authentication--multi-user).
 
 **Key Vault (default on)** — `useKeyVault` defaults to `true`, so the Azure OpenAI key, GitHub token, Postgres connection string, Search key, and Entra client secret are stored in a Key Vault instead of inline Container Apps secrets. The template creates the vault (RBAC-authorized), grants the shared managed identity the **Key Vault Secrets User** role, writes the provided secret values, and switches each app to reference them by `keyVaultUrl`. Set `-p useKeyVault=false` to inline secrets instead (not recommended).
 
@@ -671,6 +671,10 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 
 - A **👍 / 👎** on each assistant reply (optional reason on 👎) is stored in `localStorage` and mirrored to Cosmos DB (`docType: "feedback"`) via `POST /api/feedback` when history is enabled — a lightweight data flywheel for evaluation.
 
+**Accounts & profile**
+
+- The sidebar shows a **profile chip** for the current user — their **avatar** (profile picture from the identity provider when available, otherwise **coloured initials**, e.g. `Michael M` → `MM`) plus name and a **Sign out** link. When unauthenticated with Easy Auth configured, it shows per-provider **Sign in** buttons; locally it shows a "Local session" (name configurable via `LOCAL_USER_NAME`). Identity comes from [GET /api/me](chat-ui/app/api/me/route.ts); the initials/colour helpers live in [chat-ui/lib/profile.ts](chat-ui/lib/profile.ts). See [Authentication & multi-user](#authentication--multi-user).
+
 **Agents**
 
 - An **agent picker** in the top bar switches between focused personas, each with a tailored system prompt and scoped to a subset of MCP servers:
@@ -714,6 +718,26 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 | `POST /api/mcp/fetch` | Resolves a prompt template or reads a resource, returning text for the composer.                                                                                                                                                                                  |     | `GET /api/mcp/health`  | Server-side health check of each MCP server (avoids browser CORS). |
 
 > `search_wiki` is implemented against **Microsoft Learn** and is extensible to internal wikis (e.g. an Azure DevOps project wiki) — see [AzLens-mcp/src/wiki.ts](AzLens-mcp/src/wiki.ts).
+
+---
+
+## Authentication & multi-user
+
+**Sign-in** is delegated to **Azure Container Apps Easy Auth** (no passwords in the app). It's optional and provider-pluggable, configured in [infra/main.bicep](infra/main.bicep):
+
+| Provider        | Bicep parameters                                | OAuth callback to register        |
+| --------------- | ----------------------------------------------- | --------------------------------- |
+| Microsoft Entra | `entraClientId` / `entraClientSecret`           | `.../.auth/login/aad/callback`    |
+| GitHub          | `githubAuthClientId` / `githubAuthClientSecret` | `.../.auth/login/github/callback` |
+| Google          | `googleAuthClientId` / `googleAuthClientSecret` | `.../.auth/login/google/callback` |
+
+Set any combination. With one provider, unauthenticated visitors are redirected straight to it; with several, Easy Auth shows a chooser and the app also renders per-provider **Sign in** buttons (from the `AUTH_PROVIDERS` env the Bicep injects). Client secrets are stored in Key Vault (or as Container Apps secrets when `useKeyVault=false`). Leave all provider params empty to run open (everyone is the shared `local` user).
+
+**Multi-user isolation.** Each request's user is resolved from Easy Auth headers by [userIdFromHeaders](chat-ui/lib/history.ts) (`x-ms-client-principal-id` → `-name` → `local`). That `userId` **partitions all server-side data in Cosmos** — conversations, projects, and feedback — so signed-in users see only their own history across devices. Without Cosmos, history is per-browser (`localStorage`). The same identity keys per-user rate limiting.
+
+**Profile & avatars.** [GET /api/me](chat-ui/app/api/me/route.ts) parses the Easy Auth `x-ms-client-principal` claims for name, email, and a `picture`/`avatar_url` (GitHub/Google supply one; Entra usually doesn't). The sidebar profile chip shows the picture when present, otherwise a **coloured initials** avatar derived deterministically from the name/email ([lib/profile.ts](chat-ui/lib/profile.ts)) — e.g. `Michael M` → `MM`, `ada.lovelace@x.io` → `AL`. Sign out via `/.auth/logout`.
+
+> Scope: authenticated users all share the same capabilities — isolation is by data partition, not per-user RBAC. Only the Entra, GitHub, and Google providers are wired; other Easy Auth providers (Facebook, Apple, generic OIDC) can be added to the `authConfigs` resource.
 
 ---
 

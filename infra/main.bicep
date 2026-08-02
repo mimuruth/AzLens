@@ -96,6 +96,20 @@ param entraClientId string = ''
 @secure()
 param entraClientSecret string = ''
 
+@description('GitHub OAuth app client ID for Easy Auth (optional). Leave empty to skip GitHub sign-in.')
+param githubAuthClientId string = ''
+
+@description('GitHub OAuth app client secret for Easy Auth. Stored as a secret.')
+@secure()
+param githubAuthClientSecret string = ''
+
+@description('Google OAuth client ID for Easy Auth (optional). Leave empty to skip Google sign-in.')
+param googleAuthClientId string = ''
+
+@description('Google OAuth client secret for Easy Auth. Stored as a secret.')
+@secure()
+param googleAuthClientSecret string = ''
+
 @description('Store secrets in Key Vault and reference them from the container apps (recommended, default). Set false to inline secrets as Container Apps secrets instead.')
 param useKeyVault bool = true
 
@@ -121,7 +135,20 @@ var cosmosContainerName = 'conversations'
 var cosmosEndpoint = 'https://${cosmosAccountName}.documents.azure.com:443/'
 var redisName = toLower('${namePrefix}redis${take(uniqueSuffix, 8)}')
 var targetPort = 3000
-var enableAuth = !empty(entraClientId)
+var enableGitHubAuth = !empty(githubAuthClientId)
+var enableGoogleAuth = !empty(googleAuthClientId)
+var enableAuth = !empty(entraClientId) || enableGitHubAuth || enableGoogleAuth
+// Login-path names for the app's own sign-in UI (/.auth/login/<name>).
+var providerLoginNames = concat(
+  empty(entraClientId) ? [] : ['aad'],
+  enableGitHubAuth ? ['github'] : [],
+  enableGoogleAuth ? ['google'] : []
+)
+var authProviders = join(providerLoginNames, ',')
+// When exactly one provider is configured, redirect straight to it.
+var soleRedirect = length(providerLoginNames) == 1
+  ? (providerLoginNames[0] == 'aad' ? 'azureactivedirectory' : providerLoginNames[0])
+  : ''
 
 // AcrPull role definition ID.
 var acrPullRoleId = subscriptionResourceId(
@@ -215,11 +242,27 @@ resource kvGithubSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (use
   }
 }
 
-resource kvAadSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (useKeyVault && enableAuth) {
+resource kvAadSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (useKeyVault && !empty(entraClientId)) {
   parent: keyVault
   name: 'aad-client-secret'
   properties: {
     value: entraClientSecret
+  }
+}
+
+resource kvGithubAuthSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (useKeyVault && enableGitHubAuth) {
+  parent: keyVault
+  name: 'github-auth-secret'
+  properties: {
+    value: githubAuthClientSecret
+  }
+}
+
+resource kvGoogleAuthSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (useKeyVault && enableGoogleAuth) {
+  parent: keyVault
+  name: 'google-auth-secret'
+  properties: {
+    value: googleAuthClientSecret
   }
 }
 
@@ -284,7 +327,7 @@ var openAiKeyEnv = empty(azureOpenAiApiKey)
         secretRef: 'azure-openai-api-key'
       }
     ]
-var aadSecrets = !enableAuth
+var aadSecrets = empty(entraClientId)
   ? []
   : [
       useKeyVault
@@ -296,6 +339,34 @@ var aadSecrets = !enableAuth
         : {
             name: 'aad-client-secret'
             value: entraClientSecret
+          }
+    ]
+var githubAuthSecrets = !enableGitHubAuth
+  ? []
+  : [
+      useKeyVault
+        ? {
+            name: 'github-auth-secret'
+            keyVaultUrl: '${keyVaultUri}secrets/github-auth-secret'
+            identity: identity.id
+          }
+        : {
+            name: 'github-auth-secret'
+            value: githubAuthClientSecret
+          }
+    ]
+var googleAuthSecrets = !enableGoogleAuth
+  ? []
+  : [
+      useKeyVault
+        ? {
+            name: 'google-auth-secret'
+            keyVaultUrl: '${keyVaultUri}secrets/google-auth-secret'
+            identity: identity.id
+          }
+        : {
+            name: 'google-auth-secret'
+            value: googleAuthClientSecret
           }
     ]
 var searchApiKeySecrets = empty(azureSearchApiKey)
@@ -813,7 +884,7 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
           identity: identity.id
         }
       ]
-      secrets: concat(openAiSecrets, aadSecrets, redisSecrets)
+      secrets: concat(openAiSecrets, aadSecrets, githubAuthSecrets, googleAuthSecrets, redisSecrets)
     }
     template: {
       containers: [
@@ -874,6 +945,10 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
                 name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
                 value: appInsights.properties.ConnectionString
               }
+              {
+                name: 'AUTH_PROVIDERS'
+                value: authProviders
+              }
             ],
             concat(openAiKeyEnv, cosmosEnv, redisEnv, rateLimitEnv)
           )
@@ -901,6 +976,8 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
     kvSecretsUser
     kvOpenAiSecret
     kvAadSecret
+    kvGithubAuthSecret
+    kvGoogleAuthSecret
     kvRedisSecret
     redis
     cosmosDataRole
@@ -916,25 +993,53 @@ resource chatUiAuth 'Microsoft.App/containerApps/authConfigs@2024-03-01' = if (e
     platform: {
       enabled: true
     }
-    globalValidation: {
-      unauthenticatedClientAction: 'RedirectToLoginPage'
-      redirectToProvider: 'azureactivedirectory'
-    }
-    identityProviders: {
-      azureActiveDirectory: {
-        enabled: true
-        registration: {
-          clientId: entraClientId
-          openIdIssuer: '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
-          clientSecretSettingName: 'aad-client-secret'
-        }
-        validation: {
-          allowedAudiences: [
-            'api://${entraClientId}'
-          ]
-        }
-      }
-    }
+    globalValidation: union(
+      {
+        unauthenticatedClientAction: 'RedirectToLoginPage'
+      },
+      empty(soleRedirect) ? {} : { redirectToProvider: soleRedirect }
+    )
+    identityProviders: union(
+      empty(entraClientId)
+        ? {}
+        : {
+            azureActiveDirectory: {
+              enabled: true
+              registration: {
+                clientId: entraClientId
+                openIdIssuer: '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
+                clientSecretSettingName: 'aad-client-secret'
+              }
+              validation: {
+                allowedAudiences: [
+                  'api://${entraClientId}'
+                ]
+              }
+            }
+          },
+      enableGitHubAuth
+        ? {
+            gitHub: {
+              enabled: true
+              registration: {
+                clientId: githubAuthClientId
+                clientSecretSettingName: 'github-auth-secret'
+              }
+            }
+          }
+        : {},
+      enableGoogleAuth
+        ? {
+            google: {
+              enabled: true
+              registration: {
+                clientId: googleAuthClientId
+                clientSecretSettingName: 'google-auth-secret'
+              }
+            }
+          }
+        : {}
+    )
   }
 }
 

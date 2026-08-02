@@ -284,3 +284,52 @@ test("captures thumbs feedback on an assistant message (mocked API)", async ({
   expect(posted).not.toBeNull();
   expect(posted!.rating).toBe("up");
 });
+
+test("shows the signed-in user's initials avatar (mocked /api/me)", async ({
+  page,
+}) => {
+  await page.route("**/api/me", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        authenticated: true,
+        name: "Michael M",
+        email: "mimuruth@example.com",
+        picture: null,
+        provider: "github",
+        providers: ["github"],
+      }),
+    });
+  });
+  await page.goto("/");
+  await expect(page.locator(".profile-chip .avatar-initials")).toHaveText("MM");
+  await expect(page.locator(".profile-name")).toHaveText("Michael M");
+  await expect(page.getByRole("link", { name: "Sign out" })).toBeVisible();
+});
+
+test("shows provider sign-in buttons when unauthenticated (mocked /api/me)", async ({
+  page,
+}) => {
+  await page.route("**/api/me", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        authenticated: false,
+        name: null,
+        email: null,
+        picture: null,
+        provider: null,
+        providers: ["aad", "github", "google"],
+      }),
+    });
+  });
+  await page.goto("/");
+  await expect(page.getByRole("link", { name: "Microsoft" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "GitHub" })).toHaveAttribute(
+    "href",
+    /\/\.auth\/login\/github/
+  );
+  await expect(page.getByRole("link", { name: "Google" })).toBeVisible();
+});
