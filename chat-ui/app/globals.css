@@ -2714,6 +2714,29 @@ code {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
+/* ---- Session cost budget banner ---- */
+.budget-banner {
+  margin: 0 auto 6px;
+  max-width: 760px;
+  padding: 7px 12px;
+  border-radius: 9px;
+  font-size: 13px;
+  text-align: center;
+  border: 1px solid var(--border);
+}
+
+.budget-banner.warn {
+  color: #92400e;
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.budget-banner.over {
+  color: #b91c1c;
+  background: rgba(220, 38, 38, 0.12);
+  border-color: rgba(220, 38, 38, 0.4);
+}
+
 /* ---- Inline edit box ---- */
 .edit-box {
   display: flex;

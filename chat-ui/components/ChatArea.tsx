@@ -24,6 +24,7 @@ import {
 } from "@/lib/storage";
 import { AGENTS } from "@/lib/agents";
 import { isSensitiveTool } from "@/lib/tools";
+import { budgetStatus, formatUsd, SESSION_BUDGET_USD } from "@/lib/budget";
 import Logo from "@/components/Logo";
 
 type RouteAnnotation = {
@@ -928,6 +929,22 @@ export default function ChatArea({
           </div>
         )}
       </main>
+
+      {(() => {
+        const total = messages.reduce(
+          (s, m) => s + (routeInfo(m.annotations)?.costUsd ?? 0),
+          0
+        );
+        const status = budgetStatus(total);
+        if (status === "ok") return null;
+        return (
+          <div className={`budget-banner ${status}`} role="status">
+            This session has used {formatUsd(total)} of{" "}
+            {formatUsd(SESSION_BUDGET_USD)}
+            {status === "over" ? " — over the session budget." : "."}
+          </div>
+        );
+      })()}
 
       <div className="composer-wrap">
         <form ref={formRef} className="composer" onSubmit={onSubmit}>
