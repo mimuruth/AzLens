@@ -10,6 +10,7 @@ import {
   userIdFromHeaders,
   upsertFeedback,
 } from "@/lib/history";
+import { redactAndClamp } from "@/lib/redact";
 
 export async function POST(req: Request): Promise<Response> {
   if (!historyEnabled()) return Response.json({ ok: false, enabled: false });
@@ -23,12 +24,17 @@ export async function POST(req: Request): Promise<Response> {
       status: 400,
     });
   }
+  // Redact PII from free text before it's persisted.
+  const clean = (v: unknown) =>
+    typeof v === "string" && v.trim() ? redactAndClamp(v) : undefined;
   try {
     await upsertFeedback(userId, {
       convoId,
       messageId,
       rating,
-      reason: typeof body?.reason === "string" ? body.reason : undefined,
+      reason: clean(body?.reason),
+      prompt: clean(body?.prompt),
+      answer: clean(body?.answer),
     });
     return Response.json({ ok: true });
   } catch (err) {

@@ -166,6 +166,8 @@ export type StoredFeedback = {
   messageId: string;
   rating: "up" | "down";
   reason?: string;
+  prompt?: string;
+  answer?: string;
   createdAt: number;
 };
 
@@ -183,4 +185,27 @@ export async function upsertFeedback(
     createdAt: Date.now(),
   };
   await container.items.upsert(doc);
+}
+
+export async function listFeedback(
+  userId: string,
+  rating?: "up" | "down"
+): Promise<StoredFeedback[]> {
+  const container = await getContainer();
+  if (!container) return [];
+  const filter = rating ? " AND c.rating = @r" : "";
+  const { resources } = await container.items
+    .query<StoredFeedback>({
+      query:
+        "SELECT c.id, c.convoId, c.messageId, c.rating, c.reason, c.prompt, c.answer, c.createdAt " +
+        `FROM c WHERE c.userId = @u AND c.docType = 'feedback'${filter} ORDER BY c.createdAt DESC`,
+      parameters: rating
+        ? [
+            { name: "@u", value: userId },
+            { name: "@r", value: rating },
+          ]
+        : [{ name: "@u", value: userId }],
+    })
+    .fetchAll();
+  return resources;
 }

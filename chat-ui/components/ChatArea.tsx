@@ -326,6 +326,18 @@ export default function ChatArea({
       return next;
     });
     if (cleared) return;
+    // Capture the prompt/answer text so feedback can seed eval cases later.
+    const idx = messages.findIndex((m) => m.id === message.id);
+    const prevUser =
+      idx > 0
+        ? [...messages.slice(0, idx)].reverse().find((m) => m.role === "user")
+        : undefined;
+    const asText = (m?: UIMessage) =>
+      (m?.parts ?? [])
+        .filter((p) => p.type === "text")
+        .map((p) => (p as { text: string }).text)
+        .join("\n")
+        .trim() || undefined;
     void fetch("/api/feedback", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -334,6 +346,8 @@ export default function ChatArea({
         messageId: message.id,
         rating,
         reason,
+        prompt: asText(prevUser),
+        answer: asText(message),
       }),
     }).catch(() => {});
   };

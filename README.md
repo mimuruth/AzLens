@@ -669,7 +669,7 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 
 **Response feedback**
 
-- A **👍 / 👎** on each assistant reply (optional reason on 👎) is stored in `localStorage` and mirrored to Cosmos DB (`docType: "feedback"`) via `POST /api/feedback` when history is enabled — a lightweight data flywheel for evaluation.
+- A **👍 / 👎** on each assistant reply (optional reason on 👎) is stored in `localStorage` and mirrored to Cosmos DB (`docType: "feedback"`) via `POST /api/feedback` when history is enabled. Free text and the captured prompt/answer are **PII-redacted** ([lib/redact.ts](chat-ui/lib/redact.ts)) before persistence. [GET /api/feedback/export](chat-ui/app/api/feedback/export/route.ts) turns the ratings into **draft response-eval cases** ([lib/feedback-eval.ts](chat-ui/lib/feedback-eval.ts)) — a data flywheel from real usage into the eval harness.
 
 **Accounts & profile**
 
