@@ -32,6 +32,7 @@ import {
   stripMarkdownForSpeech,
 } from "@/lib/voice";
 import { extractSources } from "@/lib/sources";
+import { imageMarkdown } from "@/lib/image";
 import Logo from "@/components/Logo";
 
 type RouteAnnotation = {
@@ -359,6 +360,48 @@ export default function ChatArea({
     recognitionRef.current = rec;
     setListening(true);
     rec.start();
+  };
+
+  const [imgBusy, setImgBusy] = useState(false);
+
+  const generateImage = async () => {
+    const prompt = input.trim();
+    if (!prompt || imgBusy) return;
+    setImgBusy(true);
+    try {
+      const res = await fetch("/api/image", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error)
+        throw new Error(json.error ?? `HTTP ${res.status}`);
+      const md = imageMarkdown(prompt, json);
+      if (!md) throw new Error("No image returned.");
+      const uid =
+        "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now());
+      const next = [
+        ...messages,
+        {
+          id: `u-${uid}`,
+          role: "user" as const,
+          parts: [{ type: "text" as const, text: `/image ${prompt}` }],
+        },
+        {
+          id: `a-${uid}`,
+          role: "assistant" as const,
+          parts: [{ type: "text" as const, text: md }],
+        },
+      ];
+      setMessages(next as unknown as UIMessage[]);
+      onMessages(id, next as unknown as UIMessage[]);
+      setInput("");
+    } catch (e) {
+      window.alert(`Image generation failed: ${(e as Error).message}`);
+    } finally {
+      setImgBusy(false);
+    }
   };
 
   const speak = (message: UIMessage) => {
@@ -1194,6 +1237,34 @@ export default function ChatArea({
                 </svg>
               </button>
             )}
+            <button
+              type="button"
+              className="attach img-gen"
+              aria-label="Generate image"
+              title="Generate an image from the prompt"
+              disabled={imgBusy || input.trim().length === 0}
+              onClick={generateImage}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <rect
+                  x="3"
+                  y="4"
+                  width="18"
+                  height="16"
+                  rx="2"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                />
+                <circle cx="8.5" cy="9.5" r="1.5" fill="currentColor" />
+                <path
+                  d="M4 18l5-5 4 4 3-3 4 4"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
             <textarea
               ref={textareaRef}
               className="input"

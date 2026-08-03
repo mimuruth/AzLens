@@ -458,3 +458,21 @@ test("shows a Sources list for answers that cite links (seeded)", async ({
     sources.getByRole("link", { name: "Azure docs" })
   ).toHaveAttribute("href", "https://learn.microsoft.com/azure");
 });
+
+test("generates an image and inserts it into the chat (mocked API)", async ({
+  page,
+}) => {
+  await page.route("**/api/image", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ url: "https://example.com/cat.png" }),
+    });
+  });
+  await page.goto("/");
+  await page.getByPlaceholder("Message AzLens…").fill("a cat astronaut");
+  await page.getByRole("button", { name: "Generate image" }).click();
+  await expect(
+    page.locator('.msg.assistant img[src="https://example.com/cat.png"]')
+  ).toBeVisible();
+});
