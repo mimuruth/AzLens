@@ -18,6 +18,7 @@ const SERVERS = [
   { name: "mcp-azure-cost", url: process.env.MCP_AZURE_COST_URL },
   { name: "mcp-knowledge", url: process.env.MCP_KNOWLEDGE_URL },
   { name: "mcp-postgres", url: process.env.MCP_POSTGRES_URL },
+  { name: "mcp-memory", url: process.env.MCP_MEMORY_URL },
 ];
 
 async function ping(url: string): Promise<boolean> {

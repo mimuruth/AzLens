@@ -14,6 +14,8 @@ export const SENSITIVE_TOOLS: Record<string, ServerKey> = {
   ingest_documents: "knowledge",
   create_index: "knowledge",
   delete_documents: "knowledge",
+  remember: "memory",
+  forget: "memory",
 };
 
 export function isSensitiveTool(name: string): boolean {

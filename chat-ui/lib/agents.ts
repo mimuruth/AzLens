@@ -12,7 +12,8 @@ export type ServerKey =
   | "github"
   | "azure-cost"
   | "knowledge"
-  | "postgres";
+  | "postgres"
+  | "memory";
 
 export type Agent = {
   id: string;
@@ -41,6 +42,7 @@ export const AGENTS: Agent[] = [
       "azure-cost",
       "knowledge",
       "postgres",
+      "memory",
     ],
     systemPrompt: [
       "You are a helpful assistant with access to tools exposed by MCP servers:",
@@ -51,6 +53,7 @@ export const AGENTS: Agent[] = [
       "- mcp-azure-cost: analyze Azure spend, forecast cost, and review budgets.",
       "- mcp-knowledge: search a knowledge base (Azure AI Search) for grounded answers.",
       "- mcp-postgres: list tables, describe schema, and run read-only SQL queries.",
+      "- mcp-memory: remember, recall, and forget durable facts about the user.",
       "Use the tools when they help answer the user. Explain what you did concisely.",
     ].join("\n"),
   },

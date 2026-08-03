@@ -15,6 +15,7 @@
 | `mcp-azure-cost`         | MCP server  | Azure cost analysis (FinOps)       | `query_cost`, `get_cost_forecast`, `list_budgets`                                                                                                                          |
 | `mcp-knowledge`          | MCP server  | RAG over Azure AI Search           | `search_knowledge`, `get_document`, `ingest_documents`, `create_index`, `delete_documents`                                                                                 |
 | `mcp-postgres`           | MCP server  | Read-only PostgreSQL queries       | `list_tables`, `describe_table`, `query`                                                                                                                                   |
+| `mcp-memory`             | MCP server  | Durable per-user memory            | `remember`, `recall`, `forget`                                                                                                                                             |
 | `chat-ui`                | Next.js app | ChatGPT-style front end            | Multi-provider LLM + MCP client over all seven servers                                                                                                                     |
 
 Each MCP server ships **two transports** from a single codebase:
