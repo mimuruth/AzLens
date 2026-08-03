@@ -54,6 +54,9 @@ param azureSearchApiKey string = ''
 @description('Container image for mcp-postgres.')
 param postgresImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
+@description('Container image for mcp-memory.')
+param memoryImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+
 @description('Optional PostgreSQL connection string for mcp-postgres (read-only queries). Stored as a secret.')
 @secure()
 param databaseUrl string = ''
@@ -848,6 +851,36 @@ module postgres 'container-app.bicep' = {
   ]
 }
 
+// mcp-memory stores facts in a JSON file. The container filesystem is ephemeral
+// (per-replica), so a single replica keeps it consistent; durable cross-restart
+// persistence would need an Azure Files volume mount (follow-up).
+module memory 'container-app.bicep' = {
+  name: 'mcp-memory'
+  params: {
+    name: 'mcp-memory'
+    location: location
+    environmentId: acaEnvironment.id
+    identityId: identity.id
+    acrLoginServer: acr.properties.loginServer
+    image: memoryImage
+    targetPort: targetPort
+    externalIngress: mcpIngressExternal
+    envVars: [
+      {
+        name: 'PORT'
+        value: string(targetPort)
+      }
+      {
+        name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+        value: appInsights.properties.ConnectionString
+      }
+    ]
+  }
+  dependsOn: [
+    acrPull
+  ]
+}
+
 // ---------------------------------------------------------------------------
 // chat-ui — ChatGPT-style front end (Azure OpenAI + MCP client).
 // Declared inline (not via the shared module) because it needs secrets and,
@@ -940,6 +973,10 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
               {
                 name: 'MCP_POSTGRES_URL'
                 value: '${postgres.outputs.fqdn}/mcp'
+              }
+              {
+                name: 'MCP_MEMORY_URL'
+                value: '${memory.outputs.fqdn}/mcp'
               }
               {
                 name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'

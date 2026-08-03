@@ -4,7 +4,7 @@
 
 # MCP Multi-Server Workspace
 
-**AzLens** is a TypeScript monorepo of seven decoupled [Model Context Protocol](https://modelcontextprotocol.io) servers plus a ChatGPT-style web UI, deployable end-to-end to **Azure Container Apps** with a single GitHub Actions workflow.
+**AzLens** is a TypeScript monorepo of eight decoupled [Model Context Protocol](https://modelcontextprotocol.io) servers plus a ChatGPT-style web UI, deployable end-to-end to **Azure Container Apps** with a single GitHub Actions workflow.
 
 | Component                | Type        | Purpose                            | Tools / Role                                                                                                                                                               |
 | ------------------------ | ----------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -16,7 +16,7 @@
 | `mcp-knowledge`          | MCP server  | RAG over Azure AI Search           | `search_knowledge`, `get_document`, `ingest_documents`, `create_index`, `delete_documents`                                                                                 |
 | `mcp-postgres`           | MCP server  | Read-only PostgreSQL queries       | `list_tables`, `describe_table`, `query`                                                                                                                                   |
 | `mcp-memory`             | MCP server  | Durable per-user memory            | `remember`, `recall`, `forget`                                                                                                                                             |
-| `chat-ui`                | Next.js app | ChatGPT-style front end            | Multi-provider LLM + MCP client over all seven servers                                                                                                                     |
+| `chat-ui`                | Next.js app | ChatGPT-style front end            | Multi-provider LLM + MCP client over all eight servers                                                                                                                     |
 
 Each MCP server ships **two transports** from a single codebase:
 
@@ -296,10 +296,10 @@ You can also point the Inspector at `http://localhost:3001/mcp` using the **Stre
 
 ### Step 4 — Full end-to-end (chat UI)
 
-Requires an **Azure OpenAI** resource + chat model deployment. Run the seven servers on distinct ports, then the UI:
+Requires an **Azure OpenAI** resource + chat model deployment. Run the eight servers on distinct ports, then the UI:
 
 ```bash
-# seven terminals
+# eight terminals
 cd mcp-local-coder        && PORT=3001 npm run start:http
 cd AzLens-mcp             && PORT=3002 npm run start:http
 cd mcp-personal-assistant && PORT=3003 npm run start:http
@@ -431,7 +431,7 @@ The pipeline deploys **automatically on every push to `main`**, and can also be 
 
 **[▶ Run the deploy workflow](../../actions/workflows/deploy.yml)** _(replace with your repo URL)_
 
-Either trigger provisions the infrastructure, builds & pushes all seven container images to ACR, deploys the apps, and prints each endpoint in the run summary.
+Either trigger provisions the infrastructure, builds & pushes all container images to ACR, deploys the apps, and prints each endpoint in the run summary.
 
 > A portal "Deploy to Azure" button is intentionally not used: these are container images that must be built and pushed to a registry, which the pipeline handles end-to-end.
 
@@ -503,7 +503,7 @@ Push to `main` (or click **Run workflow**). The pipeline:
 1. logs in via OIDC,
 2. creates the resource group,
 3. deploys `infra/main.bicep` (`mcp-infra`) to create ACR + environment + identity,
-4. builds and pushes the seven images with `az acr build`,
+4. builds and pushes the container images with `az acr build`,
 5. redeploys (`mcp-apps`) with the real image tags,
 6. prints the `chat-ui`, `mcp-local-coder`, `AzLens-mcp`, and `mcp-personal-assistant` URLs in the run summary.
 
@@ -772,8 +772,8 @@ Set any combination. With one provider, unauthenticated visitors are redirected 
 - **Unit tests** — Vitest in-process tests for `mcp-local-coder` and `mcp-personal-assistant` (`npm test` in each), using the SDK's in-memory transport.
 - **Lint & format** — ESLint (`npm run lint`) for the MCP servers, Prettier (`npm run format`), an `.editorconfig`, and a **Husky pre-commit** hook that runs `lint-staged` (formats staged files).
 - **CI** ([.github/workflows/ci.yml](.github/workflows/ci.yml)) — smoke test, ESLint, per-project **build/typecheck + tests**, and **`bicep build`** on every pull request and push.
-- **Security** — [CodeQL](.github/workflows/codeql.yml) code scanning, [Trivy](.github/workflows/security-scan.yml) image scanning of all seven containers, and [Dependabot](.github/dependabot.yml) updates for npm, Docker, and GitHub Actions.
-- **Observability** — set `APPLICATIONINSIGHTS_CONNECTION_STRING` and all seven apps export traces, logs, and metrics to **Application Insights** via `@azure/monitor-opentelemetry` (servers: `src/telemetry.ts`; chat-ui: `instrumentation.ts`). The chat route also emits a custom **`chat.turn`** span per reply with the agent, provider, model, routed tier, and token counts. The Bicep provisions a workspace-based Application Insights resource and injects the connection string automatically. Leave it unset to disable.
+- **Security** — [CodeQL](.github/workflows/codeql.yml) code scanning, [Trivy](.github/workflows/security-scan.yml) image scanning of every container, and [Dependabot](.github/dependabot.yml) updates for npm, Docker, and GitHub Actions.
+- **Observability** — set `APPLICATIONINSIGHTS_CONNECTION_STRING` and every app exports traces, logs, and metrics to **Application Insights** via `@azure/monitor-opentelemetry` (servers: `src/telemetry.ts`; chat-ui: `instrumentation.ts`). The chat route also emits a custom **`chat.turn`** span per reply with the agent, provider, model, routed tier, and token counts. The Bicep provisions a workspace-based Application Insights resource and injects the connection string automatically. Leave it unset to disable.
 - **Internal-only MCP servers (default)** — the MCP servers deploy with **internal** ingress (`mcpIngressExternal=false`), reachable only by `chat-ui` within the Container Apps environment. Set `mcpIngressExternal=true` to expose them publicly (e.g. for the MCP Inspector).
 
 ---

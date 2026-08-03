@@ -26,6 +26,7 @@ jobs:
           - mcp-azure-cost
           - mcp-knowledge
           - mcp-postgres
+          - mcp-memory
           - chat-ui
     steps:
       - name: Checkout
