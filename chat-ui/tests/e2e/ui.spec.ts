@@ -397,3 +397,44 @@ test("voice: mic and speak controls appear and speak calls the API (stubbed)", a
     )
   ).toBe(true);
 });
+
+test("shows a Sources list for answers that cite links (seeded)", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "azlens.conversations",
+      JSON.stringify([
+        {
+          id: "c-s",
+          title: "Sources demo",
+          updatedAt: Date.now(),
+          renamed: true,
+        },
+      ])
+    );
+    localStorage.setItem("azlens.active", "c-s");
+    localStorage.setItem(
+      "azlens.messages.c-s",
+      JSON.stringify([
+        { id: "u1", role: "user", parts: [{ type: "text", text: "docs?" }] },
+        {
+          id: "a1",
+          role: "assistant",
+          parts: [
+            {
+              type: "text",
+              text: "See [Azure docs](https://learn.microsoft.com/azure).",
+            },
+          ],
+        },
+      ])
+    );
+  });
+  await page.goto("/");
+  const sources = page.locator(".sources");
+  await expect(sources).toBeVisible();
+  await expect(
+    sources.getByRole("link", { name: "Azure docs" })
+  ).toHaveAttribute("href", "https://learn.microsoft.com/azure");
+});

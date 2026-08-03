@@ -31,6 +31,7 @@ import {
   createRecognition,
   stripMarkdownForSpeech,
 } from "@/lib/voice";
+import { extractSources } from "@/lib/sources";
 import Logo from "@/components/Logo";
 
 type RouteAnnotation = {
@@ -870,6 +871,32 @@ export default function ChatArea({
                         }
                         return null;
                       })}
+                      {message.role === "assistant" &&
+                        (() => {
+                          const sources = extractSources(
+                            messageToText(message)
+                          );
+                          if (sources.length === 0) return null;
+                          return (
+                            <div className="sources">
+                              <span className="sources-label">Sources</span>
+                              <ol className="sources-list">
+                                {sources.map((s, i) => (
+                                  <li key={i}>
+                                    <a
+                                      href={s.url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      title={s.url}
+                                    >
+                                      {s.title}
+                                    </a>
+                                  </li>
+                                ))}
+                              </ol>
+                            </div>
+                          );
+                        })()}
                       <div className="msg-actions">
                         <button
                           type="button"

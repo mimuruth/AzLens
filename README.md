@@ -651,6 +651,7 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 - Streaming responses rendered as **Markdown** (headings, lists, tables, code blocks, links) via `react-markdown` + GFM.
 - **File & image attachments** via the ＋ button (sent as `experimental_attachments`; images are understood by vision-capable models such as `gpt-4o`).
 - **Voice mode** — a mic button dictates messages (speech-to-text) and a **Speak** action reads answers aloud (text-to-speech), via the browser Web Speech API; controls appear only when supported and markdown is stripped for clean narration ([lib/voice.ts](chat-ui/lib/voice.ts)).
+- **Sources / citations** — answers that reference links get a numbered **Sources** list beneath them (deduped, clickable), extracted by [lib/sources.ts](chat-ui/lib/sources.ts).
 - Auto-growing composer — **Enter** sends, **Shift+Enter** inserts a newline.
 - **Stop** a streaming response, **Regenerate** the last answer, **Copy** any reply, and **Edit & resend** a previous user message (which trims the turns after it).
 - A small footer under each answer shows the agent, model, routed tier, and **token usage with an estimated cost** — using the provider's reported token counts when available, or a labelled `~approx` estimate (characters ÷ 4) otherwise.

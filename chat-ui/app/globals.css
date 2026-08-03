@@ -2714,6 +2714,39 @@ code {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
+/* ---- Sources / citations under an answer ---- */
+.sources {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+}
+
+.sources-label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.sources-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+
+.sources-list a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.sources-list a:hover {
+  text-decoration: underline;
+}
+
 /* ---- Voice: mic dictation button ---- */
 .attach.mic.listening {
   color: #dc2626;
