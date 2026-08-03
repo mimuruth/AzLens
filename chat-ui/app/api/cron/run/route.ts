@@ -11,6 +11,7 @@ import { generateText } from "ai";
 import { getModel } from "@/lib/model";
 import { getMcpTools } from "@/lib/mcp";
 import { orchestrate, type OrchestratorDeps } from "@/lib/orchestrator";
+import { deliverWebhook, formatRunMessage } from "@/lib/webhook";
 
 export async function POST(req: Request): Promise<Response> {
   const secret = process.env.CRON_SECRET;
@@ -63,14 +64,23 @@ export async function POST(req: Request): Promise<Response> {
 
   try {
     const result = await orchestrate(objective, deps);
-    // The answer is logged (App Insights); wire delivery (email/webhook) as needed.
     console.info(
       `[scheduled-run] objective=${objective} steps=${result.results.length}`
     );
+    // Deliver to an incoming webhook (Slack/Teams) when configured.
+    let delivered = false;
+    const hook = process.env.SCHEDULED_WEBHOOK_URL;
+    if (hook) {
+      delivered = await deliverWebhook(
+        hook,
+        formatRunMessage(objective, result.answer, result.results.length)
+      );
+    }
     return Response.json({
       objective,
       steps: result.results.length,
       answer: result.answer,
+      delivered,
     });
   } catch (e) {
     return Response.json(

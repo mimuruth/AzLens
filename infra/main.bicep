@@ -134,6 +134,9 @@ param schedulerCron string = '0 8 * * 1'
 @description('The objective the scheduled orchestration runs.')
 param scheduledObjective string = ''
 
+@description('Optional incoming webhook (Slack/Teams) to deliver scheduled-run results to.')
+param scheduledWebhookUrl string = ''
+
 @description('Shared secret the scheduler uses to authorize /api/cron/run. Stored as a job secret.')
 @secure()
 param cronSecret string = ''
@@ -633,16 +636,26 @@ var schedulerSecrets = deployScheduler
     ]
   : []
 var schedulerEnv = deployScheduler
-  ? [
-      {
-        name: 'SCHEDULED_OBJECTIVE'
-        value: scheduledObjective
-      }
-      {
-        name: 'CRON_SECRET'
-        secretRef: 'cron-secret'
-      }
-    ]
+  ? concat(
+      [
+        {
+          name: 'SCHEDULED_OBJECTIVE'
+          value: scheduledObjective
+        }
+        {
+          name: 'CRON_SECRET'
+          secretRef: 'cron-secret'
+        }
+      ],
+      empty(scheduledWebhookUrl)
+        ? []
+        : [
+            {
+              name: 'SCHEDULED_WEBHOOK_URL'
+              value: scheduledWebhookUrl
+            }
+          ]
+    )
   : []
 
 resource kvRedisSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (useKeyVault && deployRedis) {

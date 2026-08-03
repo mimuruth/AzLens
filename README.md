@@ -541,7 +541,7 @@ az deployment group create -g rg-mcp -f infra/main.bicep \
 
 **Durable memory (optional)** — `mcp-memory` stores facts in a JSON file, which is per-replica and ephemeral by default. For persistence, either deploy with `deployMemoryStorage=true` to mount an **Azure Files** share at `/data`, or — when `deployCosmos=true` — the memory server automatically uses a **Cosmos DB** `memory` container (via managed identity), shared across replicas.
 
-**Scheduled runs (optional)** — deploy with `deployScheduler=true`, a `schedulerCron` expression, a `scheduledObjective`, and a `cronSecret` to provision a **Container Apps cron Job** that periodically calls `chat-ui`'s `/api/cron/run` (bearer-authorized) to execute the objective through the multi-agent orchestrator. Note: if Easy Auth is enabled, exclude `/api/cron/run` from it (or run without auth) so the job can reach the endpoint.
+**Scheduled runs (optional)** — deploy with `deployScheduler=true`, a `schedulerCron` expression, a `scheduledObjective`, and a `cronSecret` to provision a **Container Apps cron Job** that periodically calls `chat-ui`'s `/api/cron/run` (bearer-authorized) to execute the objective through the multi-agent orchestrator. Set `scheduledWebhookUrl` to **deliver the result to a Slack/Teams incoming webhook**. Note: if Easy Auth is enabled, exclude `/api/cron/run` from it (or run without auth) so the job can reach the endpoint.
 
 ```bash
 az deployment group create -g rg-mcp -f infra/main.bicep \
