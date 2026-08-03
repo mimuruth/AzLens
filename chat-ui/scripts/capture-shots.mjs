@@ -99,6 +99,23 @@ const main = async () => {
   });
   await context.addInitScript((data) => {
     for (const [k, v] of Object.entries(data)) localStorage.setItem(k, v);
+    // Headless Chromium has no SpeechRecognition, so the composer's dictate
+    // (speech-to-text) button is normally hidden. Stub it so the button renders
+    // for the screenshot; it is never actually invoked here.
+    if (
+      !("SpeechRecognition" in window) &&
+      !("webkitSpeechRecognition" in window)
+    ) {
+      class FakeRecognition {
+        start() {}
+        stop() {}
+        abort() {}
+      }
+      // @ts-ignore
+      window.SpeechRecognition = FakeRecognition;
+      // @ts-ignore
+      window.webkitSpeechRecognition = FakeRecognition;
+    }
   }, seed);
 
   const page = await context.newPage();
@@ -143,6 +160,19 @@ const main = async () => {
   await page.getByRole("button", { name: "Light mode" }).first().click();
   await page.waitForTimeout(500);
   await shot(page, "chat-ui-multichat.png");
+
+  // 7) Composer close-up — dictate (speech-to-text) + generate-image buttons.
+  // Back to dark, type a prompt so the image button enables, then crop to the
+  // composer so the new controls are legible in the README.
+  await page.getByRole("button", { name: "Dark mode" }).first().click();
+  await page.waitForTimeout(300);
+  await page
+    .getByPlaceholder("Message AzLens…")
+    .fill("A watercolor Azure datacenter at sunrise, isometric");
+  await page.waitForTimeout(300);
+  const composer = page.locator(".composer-wrap");
+  await composer.screenshot({ path: path.join(docs, "chat-ui-composer.png") });
+  console.log("saved chat-ui-composer.png");
 
   await browser.close();
   console.log("done →", docs);
