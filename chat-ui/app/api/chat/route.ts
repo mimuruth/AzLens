@@ -3,6 +3,7 @@ import {
   generateText,
   convertToCoreMessages,
   createDataStreamResponse,
+  formatDataStreamPart,
   type CoreMessage,
 } from "ai";
 import { getMcpTools } from "@/lib/mcp";
@@ -22,6 +23,7 @@ import {
   splitForCompaction,
   transcript,
 } from "@/lib/compaction";
+import { cacheKey, cacheGet, cacheSet } from "@/lib/cache";
 
 // The MCP client uses Node APIs, so this route must run on the Node.js runtime.
 export const runtime = "nodejs";
@@ -147,6 +149,39 @@ export async function POST(req: Request) {
     }
   }
 
+  // Optional exact-match response cache (opt-in via RESPONSE_CACHE_TTL_SEC).
+  const cacheTtl = Number(process.env.RESPONSE_CACHE_TTL_SEC ?? 0);
+  const respKey =
+    cacheTtl > 0
+      ? cacheKey({
+          agentId: agent.id,
+          provider: chosen.provider,
+          model: chosen.model,
+          system: finalSystem,
+          messages: finalMessages,
+        })
+      : "";
+  if (respKey) {
+    const cached = await cacheGet(respKey);
+    if (cached) {
+      return createDataStreamResponse({
+        execute: (dataStream) => {
+          dataStream.writeMessageAnnotation({
+            agent: agent.id,
+            agentName: agent.name,
+            provider: chosen.provider ?? "",
+            model: chosen.model ?? "",
+            cached: true,
+            ...(routed
+              ? { routed: true, tier: routed.tier, reason: routed.reason }
+              : {}),
+          });
+          dataStream.write(formatDataStreamPart("text", cached));
+        },
+      });
+    }
+  }
+
   const { tools, close } = await getMcpTools(agent.servers, {
     requireApproval: requireApproval === true,
   });
@@ -176,7 +211,7 @@ export async function POST(req: Request) {
         // On completion: report token usage + estimated cost to the UI, emit a
         // telemetry span, and close the MCP connections. Some providers don't
         // report usage for streamed responses; those values stay null.
-        onFinish: async ({ usage }) => {
+        onFinish: async ({ usage, text, steps, finishReason }) => {
           const finite = (n: unknown): number | null =>
             typeof n === "number" && Number.isFinite(n) ? n : null;
           const promptTokens = finite(usage?.promptTokens);
@@ -202,6 +237,14 @@ export async function POST(req: Request) {
             ...(costUsd != null ? { costUsd } : {}),
           });
           await close();
+
+          // Cache only tool-free, cleanly-finished answers to avoid staleness.
+          const usedTool =
+            Array.isArray(steps) &&
+            steps.some((s) => (s.toolCalls?.length ?? 0) > 0);
+          if (respKey && !usedTool && finishReason === "stop" && text?.trim()) {
+            await cacheSet(respKey, text, cacheTtl);
+          }
         },
       });
 

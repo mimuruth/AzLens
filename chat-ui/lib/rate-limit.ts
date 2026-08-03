@@ -1,5 +1,5 @@
 import "server-only";
-import type { Redis } from "ioredis";
+import { getRedis } from "./redis";
 
 /**
  * Per-caller rate limiter for /api/chat.
@@ -26,38 +26,6 @@ function inMemory(
   recent.push(now);
   hits.set(key, recent);
   return { ok: true, retryAfter: 0 };
-}
-
-// undefined = not yet initialised, null = no Redis configured/available.
-let redisClient: Redis | null | undefined;
-
-async function getRedis(): Promise<Redis | null> {
-  if (redisClient !== undefined) return redisClient;
-  const url = process.env.REDIS_URL;
-  if (!url) {
-    redisClient = null;
-    return null;
-  }
-  try {
-    const { default: RedisCtor } = await import("ioredis");
-    const client = new RedisCtor(url, {
-      maxRetriesPerRequest: 1,
-      enableOfflineQueue: false,
-      lazyConnect: false,
-    });
-    client.on("error", (err) =>
-      console.warn(
-        "Redis error (rate limit falls back to memory):",
-        err.message
-      )
-    );
-    redisClient = client;
-    return client;
-  } catch (err) {
-    console.warn("Redis init failed; using in-memory rate limit:", err);
-    redisClient = null;
-    return null;
-  }
 }
 
 export async function rateLimit(

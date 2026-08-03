@@ -536,6 +536,8 @@ az deployment group create -g rg-mcp -f infra/main.bicep \
 
 **Rate limiting (optional)** — set `rateLimitPerMin` to cap `/api/chat` requests per caller, and `deployRedis=true` to provision an **Azure Cache for Redis** so the limit is enforced **cluster-wide** across chat-ui replicas (the template injects `REDIS_URL` as a secret). Without Redis the limiter is per-replica in-memory; if Redis is configured but unreachable it fails open to in-memory.
 
+**Response cache (optional)** — with Redis configured, set `RESPONSE_CACHE_TTL_SEC` to cache byte-identical requests (hash of agent + model + system + messages) so repeats skip the model call, cutting cost and latency. Only tool-free, cleanly-finished answers are cached to avoid staleness; cached replies are flagged in the response annotations. Logic in [chat-ui/lib/cache.ts](chat-ui/lib/cache.ts).
+
 ```bash
 az deployment group create -g rg-mcp -f infra/main.bicep \
   -p infra/main.parameters.json -p deployRedis=true -p rateLimitPerMin=30
