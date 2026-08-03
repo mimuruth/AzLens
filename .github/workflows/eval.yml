@@ -1,0 +1,26 @@
+name: eval
+
+# Continuous evaluation: run the deterministic router eval on PRs and weekly, so
+# routing regressions surface as a failing check. Response-quality eval (eval:llm)
+# is intentionally excluded — it needs a live model and is run manually.
+on:
+  pull_request:
+    paths:
+      - "chat-ui/**"
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  router-eval:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: chat-ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm run eval

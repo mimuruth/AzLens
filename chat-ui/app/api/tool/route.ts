@@ -33,8 +33,15 @@ export async function POST(req: Request) {
       toolCallId: "approval",
       messages: [],
     });
+    // Audit log: which tool ran (visible in Container Apps / App Insights logs).
+    console.info(
+      `[tool-audit] ${new Date().toISOString()} tool=${tool} server=${server ?? "auto"} ok=true`
+    );
     return Response.json({ result });
   } catch (error) {
+    console.info(
+      `[tool-audit] ${new Date().toISOString()} tool=${tool} server=${server ?? "auto"} ok=false`
+    );
     return Response.json(
       { error: error instanceof Error ? error.message : String(error) },
       { status: 500 }

@@ -476,3 +476,15 @@ test("generates an image and inserts it into the chat (mocked API)", async ({
     page.locator('.msg.assistant img[src="https://example.com/cat.png"]')
   ).toBeVisible();
 });
+
+test("opens the keyboard-shortcuts overlay with ?", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("body").press("?");
+  await expect(
+    page.getByRole("dialog", { name: "Keyboard shortcuts" })
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("dialog", { name: "Keyboard shortcuts" })
+  ).toBeHidden();
+});

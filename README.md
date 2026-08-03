@@ -712,6 +712,7 @@ The `chat-ui` front end is a full-featured, claude.ai-style client.
 **Navigation & appearance**
 
 - **⌘K / Ctrl+K command palette** — jump to any chat or run actions (new chat, toggle theme, export/import).
+- **Keyboard-shortcuts overlay** — press **?** (outside a text field) for a cheat-sheet of shortcuts.
 - **Dark mode** toggle (persisted).
 - Collapsible sidebar that becomes a slim **icon rail**, with entries for **Projects** and **Artifacts** and a collapsible **Features** group.
 - **Composer mode chips** below the input (Swarm / Slide / Deep Research / Websites / Docs / Sheets) and an inline model selector next to Send.

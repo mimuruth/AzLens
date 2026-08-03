@@ -8,6 +8,7 @@ import CommandPalette from "@/components/CommandPalette";
 import ArtifactsPanel from "@/components/ArtifactsPanel";
 import ProjectsModal from "@/components/ProjectsModal";
 import OrchestratorModal from "@/components/OrchestratorModal";
+import ShortcutsOverlay from "@/components/ShortcutsOverlay";
 import {
   type Conversation,
   type Theme,
@@ -74,6 +75,7 @@ export default function Page() {
   const [collapsed, setCollapsed] = useState(false);
   const [theme, setTheme] = useState<Theme>("light");
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [providers, setProviders] = useState<ModelProvider[]>([]);
   const [modelSel, setModelSel] = useState<ModelSelection | null>(null);
   const [agentId, setAgentId] = useState<string>(DEFAULT_AGENT_ID);
@@ -166,6 +168,21 @@ export default function Page() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setPaletteOpen((v) => !v);
+        return;
+      }
+      // "?" opens the shortcuts help, unless typing in a field.
+      if (e.key === "?" && !e.metaKey && !e.ctrlKey) {
+        const t = e.target as HTMLElement | null;
+        const tag = t?.tagName;
+        if (
+          tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          tag === "SELECT" ||
+          t?.isContentEditable
+        )
+          return;
+        e.preventDefault();
+        setShortcutsOpen(true);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -829,6 +846,9 @@ export default function Page() {
       )}
       {orchestratorOpen && (
         <OrchestratorModal onClose={() => setOrchestratorOpen(false)} />
+      )}
+      {shortcutsOpen && (
+        <ShortcutsOverlay onClose={() => setShortcutsOpen(false)} />
       )}
       {paletteOpen && (
         <CommandPalette
