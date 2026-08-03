@@ -38,6 +38,33 @@ param minReplicas int = 1
 @description('Maximum replica count. Defaults to 1 because the MCP StreamableHTTP transport keeps session state in-process; raising this requires sticky sessions or externalised session state.')
 param maxReplicas int = 1
 
+@description('Optional Azure Files volume: the managed-environment storage name to mount. Empty = no volume.')
+param volumeStorageName string = ''
+
+@description('Volume name (in-app) when a storage is mounted.')
+param volumeName string = 'data'
+
+@description('Mount path inside the container when a storage is mounted.')
+param volumeMountPath string = '/data'
+
+var volumes = empty(volumeStorageName)
+  ? []
+  : [
+      {
+        name: volumeName
+        storageType: 'AzureFile'
+        storageName: volumeStorageName
+      }
+    ]
+var volumeMounts = empty(volumeStorageName)
+  ? []
+  : [
+      {
+        volumeName: volumeName
+        mountPath: volumeMountPath
+      }
+    ]
+
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: name
   location: location
@@ -81,6 +108,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             memory: '1Gi'
           }
           env: envVars
+          volumeMounts: volumeMounts
           probes: [
             {
               type: 'Liveness'
@@ -107,6 +135,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         minReplicas: minReplicas
         maxReplicas: maxReplicas
       }
+      volumes: volumes
     }
   }
 }

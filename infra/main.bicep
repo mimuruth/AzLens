@@ -122,6 +122,9 @@ param deployCosmos bool = false
 @description('Deploy an Azure Cache for Redis and use it for cluster-wide /api/chat rate limiting. When false, rate limiting is per-replica in-memory.')
 param deployRedis bool = false
 
+@description('Mount an Azure Files share on mcp-memory so remembered facts persist across restarts. When false, memory is per-replica and ephemeral.')
+param deployMemoryStorage bool = false
+
 @description('Max /api/chat requests per caller per minute. 0 disables rate limiting.')
 param rateLimitPerMin int = 0
 
@@ -137,6 +140,7 @@ var cosmosDatabaseName = 'azlens'
 var cosmosContainerName = 'conversations'
 var cosmosEndpoint = 'https://${cosmosAccountName}.documents.azure.com:443/'
 var redisName = toLower('${namePrefix}redis${take(uniqueSuffix, 8)}')
+var memStorageAccountName = toLower('mem${uniqueSuffix}')
 var targetPort = 3000
 var enableGitHubAuth = !empty(githubAuthClientId)
 var enableGoogleAuth = !empty(googleAuthClientId)
@@ -854,6 +858,49 @@ module postgres 'container-app.bicep' = {
 // mcp-memory stores facts in a JSON file. The container filesystem is ephemeral
 // (per-replica), so a single replica keeps it consistent; durable cross-restart
 // persistence would need an Azure Files volume mount (follow-up).
+// Optional Azure Files storage so mcp-memory persists across restarts/replicas.
+resource memStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = if (deployMemoryStorage) {
+  name: memStorageAccountName
+  location: location
+  sku: {
+    name: 'Standard_LRS'
+  }
+  kind: 'StorageV2'
+  properties: {
+    minimumTlsVersion: 'TLS1_2'
+    allowBlobPublicAccess: false
+  }
+}
+
+resource memFileService 'Microsoft.Storage/storageAccounts/fileServices@2023-05-01' = if (deployMemoryStorage) {
+  parent: memStorage
+  name: 'default'
+}
+
+resource memShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2023-05-01' = if (deployMemoryStorage) {
+  parent: memFileService
+  name: 'memory'
+  properties: {
+    shareQuota: 1
+  }
+}
+
+resource memEnvStorage 'Microsoft.App/managedEnvironments/storages@2024-03-01' = if (deployMemoryStorage) {
+  parent: acaEnvironment
+  name: 'memory'
+  properties: {
+    azureFile: {
+      accountName: memStorageAccountName
+      accountKey: deployMemoryStorage ? memStorage.listKeys().keys[0].value : ''
+      shareName: 'memory'
+      accessMode: 'ReadWrite'
+    }
+  }
+  dependsOn: [
+    memShare
+  ]
+}
+
 module memory 'container-app.bicep' = {
   name: 'mcp-memory'
   params: {
@@ -865,19 +912,31 @@ module memory 'container-app.bicep' = {
     image: memoryImage
     targetPort: targetPort
     externalIngress: mcpIngressExternal
-    envVars: [
-      {
-        name: 'PORT'
-        value: string(targetPort)
-      }
-      {
-        name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
-        value: appInsights.properties.ConnectionString
-      }
-    ]
+    volumeStorageName: deployMemoryStorage ? 'memory' : ''
+    envVars: concat(
+      [
+        {
+          name: 'PORT'
+          value: string(targetPort)
+        }
+        {
+          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+          value: appInsights.properties.ConnectionString
+        }
+      ],
+      deployMemoryStorage
+        ? [
+            {
+              name: 'MEMORY_FILE'
+              value: '/data/memory.json'
+            }
+          ]
+        : []
+    )
   }
   dependsOn: [
     acrPull
+    memEnvStorage
   ]
 }
 

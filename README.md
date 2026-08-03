@@ -539,6 +539,8 @@ az deployment group create -g rg-mcp -f infra/main.bicep \
 
 **Response cache (optional)** — with Redis configured, set `RESPONSE_CACHE_TTL_SEC` to cache byte-identical requests (hash of agent + model + system + messages) so repeats skip the model call, cutting cost and latency. Only tool-free, cleanly-finished answers are cached to avoid staleness; cached replies are flagged in the response annotations. Logic in [chat-ui/lib/cache.ts](chat-ui/lib/cache.ts).
 
+**Durable memory (optional)** — `mcp-memory` stores facts in a JSON file, which is per-replica and ephemeral by default. Deploy with `deployMemoryStorage=true` to provision an **Azure Files** share and mount it at `/data` (with `MEMORY_FILE=/data/memory.json`) so remembered facts persist across restarts and are shared across replicas.
+
 ```bash
 az deployment group create -g rg-mcp -f infra/main.bicep \
   -p infra/main.parameters.json -p deployRedis=true -p rateLimitPerMin=30
