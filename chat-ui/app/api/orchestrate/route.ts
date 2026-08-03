@@ -2,7 +2,11 @@ import { generateText } from "ai";
 import { getModel } from "@/lib/model";
 import { getMcpTools } from "@/lib/mcp";
 import { estimateCost } from "@/lib/pricing";
-import { orchestrate, type OrchestratorDeps } from "@/lib/orchestrator";
+import {
+  orchestrate,
+  sanitizePlan,
+  type OrchestratorDeps,
+} from "@/lib/orchestrator";
 import { rateLimit, callerKey } from "@/lib/rate-limit";
 import { moderateText } from "@/lib/safety";
 
@@ -24,10 +28,11 @@ export async function POST(req: Request) {
     }
   }
 
-  const { objective } = await req.json().catch(() => ({}));
+  const { objective, plan } = await req.json().catch(() => ({}));
   if (typeof objective !== "string" || objective.trim().length === 0) {
     return Response.json({ error: "Missing objective." }, { status: 400 });
   }
+  const presetPlan = Array.isArray(plan) ? sanitizePlan(plan) : undefined;
 
   const moderation = await moderateText(objective);
   if (!moderation.allowed) {
@@ -78,7 +83,7 @@ export async function POST(req: Request) {
         controller.enqueue(enc.encode(JSON.stringify(e) + "\n"));
       deps.onEvent = emit;
       try {
-        await orchestrate(objective.trim(), deps);
+        await orchestrate(objective.trim(), deps, presetPlan);
       } catch (e) {
         emit({
           type: "error",

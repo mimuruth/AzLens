@@ -150,6 +150,22 @@ test("creates the index and ingests project files (mocked tool API)", async ({
 });
 
 test("runs the multi-agent orchestrator (mocked API)", async ({ page }) => {
+  await page.route("**/api/orchestrate/plan", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        plan: [
+          { agentId: "research", task: "Gather latency facts" },
+          { agentId: "coder", task: "Write a retry helper" },
+        ],
+        agents: [
+          { id: "research", name: "Research" },
+          { id: "coder", name: "Code Assistant" },
+        ],
+      }),
+    });
+  });
   await page.route("**/api/orchestrate", async (route) => {
     const events = [
       {
@@ -218,9 +234,13 @@ test("runs the multi-agent orchestrator (mocked API)", async ({ page }) => {
     page.getByRole("dialog", { name: "Orchestrator" })
   ).toBeVisible();
   await page
-    .getByPlaceholder(/the planner splits it across/i)
+    .getByPlaceholder(/the planner proposes a plan/i)
     .fill("Compare regions and add retries");
-  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await page.getByRole("button", { name: "Plan", exact: true }).click();
+  // Review phase shows the editable plan; approve to run.
+  await expect(page.locator(".orchestrator-review")).toBeVisible();
+  await expect(page.locator(".orchestrator-plan-edit")).toHaveCount(2);
+  await page.getByRole("button", { name: "Approve & run" }).click();
 
   await expect(page.locator(".orchestrator-answer")).toContainText(
     /West Europe/

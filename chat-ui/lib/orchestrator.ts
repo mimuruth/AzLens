@@ -158,6 +158,38 @@ export async function planTasks(
   return plan.length > 0 ? plan : [{ agentId: "general", task: objective }];
 }
 
+/** Validate a caller-supplied (e.g. user-edited) plan the same way parsePlan does. */
+export function sanitizePlan(
+  tasks: { agentId?: string; task?: string; dependsOn?: number[] }[]
+): SubTask[] {
+  const out: SubTask[] = [];
+  for (const t of tasks ?? []) {
+    const agentId = String(t?.agentId ?? "").trim();
+    const task = String(t?.task ?? "").trim();
+    if (!task || !VALID_IDS.has(agentId)) continue;
+    const dependsOn = Array.isArray(t.dependsOn)
+      ? t.dependsOn
+          .map((n) => Math.trunc(Number(n)))
+          .filter((n) => Number.isFinite(n))
+      : undefined;
+    out.push(
+      dependsOn && dependsOn.length
+        ? { agentId, task, dependsOn }
+        : { agentId, task }
+    );
+    if (out.length >= MAX_SUBTASKS) break;
+  }
+  return out.map((t) => {
+    if (!t.dependsOn) return t;
+    const deps = [...new Set(t.dependsOn)].filter(
+      (i) => i >= 0 && i < out.length && i !== out.indexOf(t)
+    );
+    return deps.length
+      ? { ...t, dependsOn: deps }
+      : { agentId: t.agentId, task: t.task };
+  });
+}
+
 const SYNTH_SYSTEM =
   "You are a synthesis coordinator. You merge specialist agents' results into " +
   "one coherent answer for the user, noting which agent contributed what.";
@@ -292,9 +324,13 @@ export async function runPlan(
 
 export async function orchestrate(
   objective: string,
-  deps: OrchestratorDeps
+  deps: OrchestratorDeps,
+  presetPlan?: SubTask[]
 ): Promise<Orchestration> {
-  const plan = await planTasks(objective, deps);
+  const plan =
+    presetPlan && presetPlan.length > 0
+      ? presetPlan
+      : await planTasks(objective, deps);
   deps.onEvent?.({ type: "plan", plan });
 
   const results = await runPlan(plan, deps);

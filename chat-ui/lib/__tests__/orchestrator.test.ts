@@ -4,6 +4,7 @@ import {
   planTasks,
   orchestrate,
   runPlan,
+  sanitizePlan,
   buildPlannerPrompt,
   MAX_SUBTASKS,
   type OrchestratorDeps,
@@ -102,6 +103,49 @@ describe("buildPlannerPrompt", () => {
     expect(p).toContain("research:");
     expect(p).toContain("coder:");
     expect(p).not.toMatch(/^- general:/m);
+  });
+});
+
+describe("sanitizePlan", () => {
+  it("drops invalid agent ids and empty tasks", () => {
+    expect(
+      sanitizePlan([
+        { agentId: "coder", task: "build" },
+        { agentId: "nope", task: "x" },
+        { agentId: "cost", task: "" },
+      ])
+    ).toEqual([{ agentId: "coder", task: "build" }]);
+  });
+
+  it("keeps valid dependsOn and caps at MAX_SUBTASKS", () => {
+    const many = Array.from({ length: 9 }, () => ({
+      agentId: "coder",
+      task: "t",
+    }));
+    expect(sanitizePlan(many)).toHaveLength(MAX_SUBTASKS);
+    expect(
+      sanitizePlan([
+        { agentId: "research", task: "a" },
+        { agentId: "coder", task: "b", dependsOn: [0] },
+      ])[1].dependsOn
+    ).toEqual([0]);
+  });
+});
+
+describe("orchestrate with a preset plan", () => {
+  it("skips planning and runs the supplied plan", async () => {
+    let planned = false;
+    const deps: OrchestratorDeps = {
+      generate: async (prompt) => {
+        if (prompt.includes("Decompose the objective")) planned = true;
+        return "FINAL";
+      },
+      runAgent: async (agent) => `[${agent.id}]`,
+    };
+    const preset = [{ agentId: "cost", task: "check spend" }];
+    const result = await orchestrate("obj", deps, preset);
+    expect(planned).toBe(false); // planner was not invoked
+    expect(result.results.map((r) => r.agentId)).toEqual(["cost"]);
   });
 });
 

@@ -39,6 +39,11 @@ export default function OrchestratorModal({
   const [steps, setSteps] = useState<Record<number, StepState>>({});
   const [answer, setAnswer] = useState("");
   const [open, setOpen] = useState<Set<number>>(new Set());
+  const [phase, setPhase] = useState<"idle" | "review" | "running">("idle");
+  const [agents, setAgents] = useState<{ id: string; name: string }[]>([]);
+  const [draftPlan, setDraftPlan] = useState<
+    { agentId: string; task: string }[]
+  >([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -106,7 +111,8 @@ export default function OrchestratorModal({
     }
   };
 
-  const run = async () => {
+  // Phase 1: fetch the planner's proposed plan for review/editing.
+  const startPlan = async () => {
     const obj = objective.trim();
     if (!obj || busy) return;
     setBusy(true);
@@ -115,10 +121,47 @@ export default function OrchestratorModal({
     setAnswer("");
     setOpen(new Set());
     try {
-      const res = await fetch("/api/orchestrate", {
+      const res = await fetch("/api/orchestrate/plan", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ objective: obj }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error)
+        throw new Error(json.error ?? `HTTP ${res.status}`);
+      setAgents(json.agents ?? []);
+      setDraftPlan(
+        (json.plan ?? []).map((p: { agentId: string; task: string }) => ({
+          agentId: p.agentId,
+          task: p.task,
+        }))
+      );
+      setPhase("review");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Phase 2: run the (approved, possibly edited) plan with live streaming.
+  const streamRun = async () => {
+    const obj = objective.trim();
+    if (!obj) return;
+    setBusy(true);
+    setError(null);
+    setSteps({});
+    setAnswer("");
+    setOpen(new Set());
+    setPhase("running");
+    try {
+      const res = await fetch("/api/orchestrate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          objective: obj,
+          plan: draftPlan.filter((s) => s.task.trim()),
+        }),
       });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
       const reader = res.body.getReader();
@@ -212,22 +255,98 @@ export default function OrchestratorModal({
             value={objective}
             onChange={(e) => setObjective(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) run();
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) startPlan();
             }}
             rows={3}
-            placeholder="Describe an objective — the planner splits it across specialist agents (⌘/Ctrl+Enter to run)…"
+            placeholder="Describe an objective — the planner proposes a plan you can review before it runs (⌘/Ctrl+Enter)…"
           />
           <button
             type="button"
             className="btn-primary"
-            onClick={run}
+            onClick={startPlan}
             disabled={busy || objective.trim().length === 0}
           >
-            {busy ? "Orchestrating…" : "Run"}
+            {busy && phase !== "running" ? "Planning…" : "Plan"}
           </button>
         </div>
 
         {error && <p className="orchestrator-error">{error}</p>}
+
+        {phase === "review" && (
+          <div className="orchestrator-review">
+            <span className="orchestrator-label">Review plan</span>
+            {draftPlan.map((s, i) => (
+              <div key={i} className="orchestrator-plan-edit">
+                <select
+                  value={s.agentId}
+                  onChange={(e) =>
+                    setDraftPlan((prev) =>
+                      prev.map((p, j) =>
+                        j === i ? { ...p, agentId: e.target.value } : p
+                      )
+                    )
+                  }
+                >
+                  {agents.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  value={s.task}
+                  onChange={(e) =>
+                    setDraftPlan((prev) =>
+                      prev.map((p, j) =>
+                        j === i ? { ...p, task: e.target.value } : p
+                      )
+                    )
+                  }
+                  placeholder="Sub-task…"
+                />
+                <button
+                  type="button"
+                  className="msg-action danger"
+                  onClick={() =>
+                    setDraftPlan((prev) => prev.filter((_, j) => j !== i))
+                  }
+                  aria-label="Remove step"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <div className="orchestrator-review-actions">
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() =>
+                  setDraftPlan((prev) => [
+                    ...prev,
+                    { agentId: agents[0]?.id ?? "general", task: "" },
+                  ])
+                }
+              >
+                Add step
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={draftPlan.filter((s) => s.task.trim()).length === 0}
+                onClick={streamRun}
+              >
+                Approve &amp; run
+              </button>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setPhase("idle")}
+              >
+                Back
+              </button>
+            </div>
+          </div>
+        )}
 
         {(indices.length > 0 || answer) && (
           <div className="orchestrator-result">
