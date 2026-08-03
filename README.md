@@ -539,7 +539,9 @@ az deployment group create -g rg-mcp -f infra/main.bicep \
 
 **Response cache (optional)** — with Redis configured, set `RESPONSE_CACHE_TTL_SEC` to cache byte-identical requests (hash of agent + model + system + messages) so repeats skip the model call, cutting cost and latency. Only tool-free, cleanly-finished answers are cached to avoid staleness; cached replies are flagged in the response annotations. Logic in [chat-ui/lib/cache.ts](chat-ui/lib/cache.ts).
 
-**Durable memory (optional)** — `mcp-memory` stores facts in a JSON file, which is per-replica and ephemeral by default. Deploy with `deployMemoryStorage=true` to provision an **Azure Files** share and mount it at `/data` (with `MEMORY_FILE=/data/memory.json`) so remembered facts persist across restarts and are shared across replicas.
+**Durable memory (optional)** — `mcp-memory` stores facts in a JSON file, which is per-replica and ephemeral by default. For persistence, either deploy with `deployMemoryStorage=true` to mount an **Azure Files** share at `/data`, or — when `deployCosmos=true` — the memory server automatically uses a **Cosmos DB** `memory` container (via managed identity), shared across replicas.
+
+**Scheduled runs (optional)** — deploy with `deployScheduler=true`, a `schedulerCron` expression, a `scheduledObjective`, and a `cronSecret` to provision a **Container Apps cron Job** that periodically calls `chat-ui`'s `/api/cron/run` (bearer-authorized) to execute the objective through the multi-agent orchestrator. Note: if Easy Auth is enabled, exclude `/api/cron/run` from it (or run without auth) so the job can reach the endpoint.
 
 ```bash
 az deployment group create -g rg-mcp -f infra/main.bicep \

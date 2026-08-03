@@ -125,6 +125,19 @@ param deployRedis bool = false
 @description('Mount an Azure Files share on mcp-memory so remembered facts persist across restarts. When false, memory is per-replica and ephemeral.')
 param deployMemoryStorage bool = false
 
+@description('Deploy a scheduled Container Apps Job that runs a preset orchestration on a cron schedule.')
+param deployScheduler bool = false
+
+@description('Cron expression (UTC) for the scheduled orchestration. Default: Mondays 08:00.')
+param schedulerCron string = '0 8 * * 1'
+
+@description('The objective the scheduled orchestration runs.')
+param scheduledObjective string = ''
+
+@description('Shared secret the scheduler uses to authorize /api/cron/run. Stored as a job secret.')
+@secure()
+param cronSecret string = ''
+
 @description('Max /api/chat requests per caller per minute. 0 disables rate limiting.')
 param rateLimitPerMin int = 0
 
@@ -510,6 +523,23 @@ resource cosmosContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/con
   }
 }
 
+// Container backing mcp-memory when Cosmos is deployed.
+resource cosmosMemoryContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15' = if (deployCosmos) {
+  parent: cosmosDb
+  name: 'memory'
+  properties: {
+    resource: {
+      id: 'memory'
+      partitionKey: {
+        paths: [
+          '/userId'
+        ]
+        kind: 'Hash'
+      }
+    }
+  }
+}
+
 // Cosmos DB Built-in Data Contributor (data-plane) role for the identity.
 resource cosmosDataRole 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-05-15' = if (deployCosmos) {
   parent: cosmos
@@ -590,6 +620,27 @@ var rateLimitEnv = rateLimitPerMin > 0
       {
         name: 'RATE_LIMIT_PER_MIN'
         value: string(rateLimitPerMin)
+      }
+    ]
+  : []
+
+var schedulerSecrets = deployScheduler
+  ? [
+      {
+        name: 'cron-secret'
+        value: cronSecret
+      }
+    ]
+  : []
+var schedulerEnv = deployScheduler
+  ? [
+      {
+        name: 'SCHEDULED_OBJECTIVE'
+        value: scheduledObjective
+      }
+      {
+        name: 'CRON_SECRET'
+        secretRef: 'cron-secret'
       }
     ]
   : []
@@ -931,12 +982,26 @@ module memory 'container-app.bicep' = {
               value: '/data/memory.json'
             }
           ]
+        : [],
+      deployCosmos
+        ? [
+            {
+              name: 'COSMOS_ENDPOINT'
+              value: cosmosEndpoint
+            }
+            {
+              name: 'AZURE_CLIENT_ID'
+              value: identity.properties.clientId
+            }
+          ]
         : []
     )
   }
   dependsOn: [
     acrPull
     memEnvStorage
+    cosmosDataRole
+    cosmosMemoryContainer
   ]
 }
 
@@ -976,7 +1041,7 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
           identity: identity.id
         }
       ]
-      secrets: concat(openAiSecrets, aadSecrets, githubAuthSecrets, googleAuthSecrets, redisSecrets)
+      secrets: concat(openAiSecrets, aadSecrets, githubAuthSecrets, googleAuthSecrets, redisSecrets, schedulerSecrets)
     }
     template: {
       containers: [
@@ -1046,7 +1111,7 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
                 value: authProviders
               }
             ],
-            concat(openAiKeyEnv, cosmosEnv, redisEnv, rateLimitEnv)
+            concat(openAiKeyEnv, cosmosEnv, redisEnv, rateLimitEnv, schedulerEnv)
           )
           probes: [
             {
@@ -1079,6 +1144,57 @@ resource chatUi 'Microsoft.App/containerApps@2024-03-01' = {
     cosmosDataRole
     cosmosContainer
   ]
+}
+
+// Optional scheduled orchestration: a cron Container Apps Job that calls
+// chat-ui's /api/cron/run with the shared secret.
+resource schedulerJob 'Microsoft.App/jobs@2024-03-01' = if (deployScheduler) {
+  name: 'orchestrator-cron'
+  location: location
+  properties: {
+    environmentId: acaEnvironment.id
+    configuration: {
+      triggerType: 'Schedule'
+      scheduleTriggerConfig: {
+        cronExpression: schedulerCron
+        parallelism: 1
+        replicaCompletionCount: 1
+      }
+      replicaTimeout: 300
+      replicaRetryLimit: 1
+      secrets: [
+        {
+          name: 'cron-secret'
+          value: cronSecret
+        }
+      ]
+    }
+    template: {
+      containers: [
+        {
+          name: 'curl'
+          image: 'curlimages/curl:8.11.1'
+          command: [
+            'sh'
+            '-c'
+          ]
+          args: [
+            'curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" "https://${chatUi.properties.configuration.ingress.fqdn}/api/cron/run"'
+          ]
+          env: [
+            {
+              name: 'CRON_SECRET'
+              secretRef: 'cron-secret'
+            }
+          ]
+          resources: {
+            cpu: json('0.25')
+            memory: '0.5Gi'
+          }
+        }
+      ]
+    }
+  }
 }
 
 // Optional Easy Auth: protects chat-ui behind Microsoft Entra sign-in.
