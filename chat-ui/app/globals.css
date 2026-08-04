@@ -1367,6 +1367,34 @@ code {
   color: var(--text);
 }
 
+.tools-head-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* Online-tool count next to the collapsed "MCP tools" label. */
+.tools-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--text-muted);
+  background: var(--hover-strong);
+}
+
+.tools-count.ok {
+  color: #3fb950;
+  background: rgba(63, 185, 80, 0.14);
+}
+
 .chev {
   transition: transform 0.15s;
 }

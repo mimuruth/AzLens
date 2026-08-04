@@ -1000,7 +1000,21 @@ export default function Sidebar({
               onClick={() => setToolsOpen((v) => !v)}
               aria-expanded={toolsOpen}
             >
-              <span>MCP tools</span>
+              <span className="tools-head-title">
+                MCP tools
+                {servers.length > 0 && (
+                  <span
+                    className={`tools-count${
+                      servers.every((s) => s.ok) ? " ok" : ""
+                    }`}
+                    title={`${servers.filter((s) => s.ok).length} of ${
+                      servers.length
+                    } tools online`}
+                  >
+                    {servers.filter((s) => s.ok).length}
+                  </span>
+                )}
+              </span>
               <svg
                 width="14"
                 height="14"
