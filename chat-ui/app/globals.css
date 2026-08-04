@@ -152,6 +152,40 @@ body {
   overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
+  transition: -webkit-mask-image 0.2s ease;
+}
+
+/* Directional fade affordance — only the edge with more content fades out,
+   so buttons are never dimmed while at rest. */
+.sidebar-scroll.fade-top:not(.fade-bottom) {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 24px);
+  mask-image: linear-gradient(to bottom, transparent, #000 24px);
+}
+
+.sidebar-scroll.fade-bottom:not(.fade-top) {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 calc(100% - 24px),
+    transparent
+  );
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+}
+
+.sidebar-scroll.fade-top.fade-bottom {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 24px,
+    #000 calc(100% - 24px),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 24px,
+    #000 calc(100% - 24px),
+    transparent
+  );
 }
 
 .sidebar-head {

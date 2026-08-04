@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   type Conversation,
   type Theme,
@@ -312,6 +318,18 @@ export default function Sidebar({
   const [savedOpen, setSavedOpen] = useState(false);
   const [featuresOpen, setFeaturesOpen] = useState(true);
   const [projectsPanelOpen, setProjectsPanelOpen] = useState(true);
+  // Directional fade affordance: only fade the edge that has more content.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ top: false, bottom: false });
+  const updateEdges = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const top = el.scrollTop > 4;
+    const bottom = el.scrollTop + el.clientHeight < el.scrollHeight - 4;
+    setEdges((p) =>
+      p.top === top && p.bottom === bottom ? p : { top, bottom }
+    );
+  }, []);
   const activeProjectName = activeProjectId
     ? (projects.find((p) => p.id === activeProjectId)?.name ?? null)
     : null;
@@ -319,6 +337,23 @@ export default function Sidebar({
     prompts: LibraryPrompt[];
     resources: LibraryResource[];
   }>({ prompts: [], resources: [] });
+
+  // Recompute fade edges on scroll, resize, and whenever content height may
+  // have changed (panels toggling, list updates re-run this after render).
+  useLayoutEffect(() => {
+    updateEdges();
+  });
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", updateEdges, { passive: true });
+    const ro = new ResizeObserver(updateEdges);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", updateEdges);
+      ro.disconnect();
+    };
+  }, [updateEdges]);
 
   // Poll MCP server health.
   useEffect(() => {
@@ -655,7 +690,12 @@ export default function Sidebar({
           </button>
         </div>
 
-        <div className="sidebar-scroll">
+        <div
+          className={`sidebar-scroll${edges.top ? " fade-top" : ""}${
+            edges.bottom ? " fade-bottom" : ""
+          }`}
+          ref={scrollRef}
+        >
           <button className="new-chat" onClick={onNew}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path
