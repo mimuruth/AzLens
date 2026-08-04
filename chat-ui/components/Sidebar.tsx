@@ -655,509 +655,520 @@ export default function Sidebar({
           </button>
         </div>
 
-        <button className="new-chat" onClick={onNew}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M12 5v14M5 12h14"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </svg>
-          New chat
-        </button>
-
-        <div className="tools-panel projects-panel">
-          <div className="projects-head-row">
-            <button
-              className="tools-head projects-toggle"
-              onClick={() => setProjectsPanelOpen((v) => !v)}
-              aria-expanded={projectsPanelOpen}
-            >
-              <span>Projects</span>
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                className={projectsPanelOpen ? "chev open" : "chev"}
-              >
-                <path
-                  d="M6 9l6 6 6-6"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-            <button
-              type="button"
-              className="projects-manage"
-              onClick={onOpenProjects}
-              title="Manage projects"
-            >
-              Manage
-            </button>
-          </div>
-          {projectsPanelOpen && (
-            <div className="tools-list">
-              <button
-                type="button"
-                className={`project-nav ${activeProjectId === null ? "active" : ""}`}
-                onClick={() => onSelectProject(null)}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  const id = e.dataTransfer.getData("text/plain");
-                  if (id) onAssignChatToProject(id, null);
-                }}
-              >
-                <span className="project-nav-icon">☰</span>
-                <span className="project-nav-name">All chats</span>
-              </button>
-              {projects.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className={`project-nav ${activeProjectId === p.id ? "active" : ""}`}
-                  onClick={() => onSelectProject(p.id)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
-                    const id = e.dataTransfer.getData("text/plain");
-                    if (id) onAssignChatToProject(id, p.id);
-                  }}
-                  title={`${p.name} — drop a chat here to add it`}
-                >
-                  <span className="project-nav-icon">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                      <path
-                        d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
-                        stroke="currentColor"
-                        strokeWidth="1.7"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </span>
-                  <span className="project-nav-name">{p.name}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <button
-          className="side-entry"
-          onClick={onOpenArtifacts}
-          title="Artifacts"
-        >
-          <span className="side-entry-icon">
+        <div className="sidebar-scroll">
+          <button className="new-chat" onClick={onNew}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path
-                d="M12 3l9 5-9 5-9-5 9-5z"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M3 13l9 5 9-5"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </span>
-          Artifacts
-        </button>
-
-        <button
-          className="side-entry"
-          onClick={onOpenOrchestrator}
-          title="Orchestrator — plan and delegate across agents"
-        >
-          <span className="side-entry-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <circle
-                cx="12"
-                cy="5"
-                r="2.4"
-                stroke="currentColor"
-                strokeWidth="1.7"
-              />
-              <circle
-                cx="5"
-                cy="18"
-                r="2.4"
-                stroke="currentColor"
-                strokeWidth="1.7"
-              />
-              <circle
-                cx="19"
-                cy="18"
-                r="2.4"
-                stroke="currentColor"
-                strokeWidth="1.7"
-              />
-              <path
-                d="M12 7.4V12M12 12l-5.2 3.8M12 12l5.2 3.8"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-              />
-            </svg>
-          </span>
-          Orchestrator
-        </button>
-
-        <button
-          className="side-entry"
-          onClick={() => onUseTool(AGENT_GUIDE_PROMPT)}
-          title="AI Agent Guide"
-        >
-          <span className="side-entry-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M5 4h11a2 2 0 012 2v14H7a2 2 0 01-2-2V4z"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M9 8h6M9 12h6"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-              />
-            </svg>
-          </span>
-          AI Agent Guide
-        </button>
-
-        <div className="tools-panel features-panel">
-          <button
-            className="tools-head"
-            onClick={() => setFeaturesOpen((v) => !v)}
-            aria-expanded={featuresOpen}
-          >
-            <span>Features</span>
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              className={featuresOpen ? "chev open" : "chev"}
-            >
-              <path
-                d="M6 9l6 6 6-6"
+                d="M12 5v14M5 12h14"
                 stroke="currentColor"
                 strokeWidth="2"
                 strokeLinecap="round"
-                strokeLinejoin="round"
               />
             </svg>
+            New chat
           </button>
-          {featuresOpen && (
-            <div className="tools-list">
-              {FEATURE_ITEMS.map((f) => (
-                <button
-                  key={f.id}
-                  className="feature-item"
-                  onClick={() => onUseTool(f.prompt, f.mode ?? null)}
-                  title={f.label}
+
+          <div className="tools-panel projects-panel">
+            <div className="projects-head-row">
+              <button
+                className="tools-head projects-toggle"
+                onClick={() => setProjectsPanelOpen((v) => !v)}
+                aria-expanded={projectsPanelOpen}
+              >
+                <span>Projects</span>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className={projectsPanelOpen ? "chev open" : "chev"}
                 >
-                  <span className="feature-icon">
-                    <FeatureIcon id={f.id} />
-                  </span>
-                  <span className="feature-label">{f.label}</span>
-                </button>
-              ))}
+                  <path
+                    d="M6 9l6 6 6-6"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="projects-manage"
+                onClick={onOpenProjects}
+                title="Manage projects"
+              >
+                Manage
+              </button>
             </div>
-          )}
-        </div>
+            {projectsPanelOpen && (
+              <div className="tools-list">
+                <button
+                  type="button"
+                  className={`project-nav ${activeProjectId === null ? "active" : ""}`}
+                  onClick={() => onSelectProject(null)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    const id = e.dataTransfer.getData("text/plain");
+                    if (id) onAssignChatToProject(id, null);
+                  }}
+                >
+                  <span className="project-nav-icon">☰</span>
+                  <span className="project-nav-name">All chats</span>
+                </button>
+                {projects.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`project-nav ${activeProjectId === p.id ? "active" : ""}`}
+                    onClick={() => onSelectProject(p.id)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      const id = e.dataTransfer.getData("text/plain");
+                      if (id) onAssignChatToProject(id, p.id);
+                    }}
+                    title={`${p.name} — drop a chat here to add it`}
+                  >
+                    <span className="project-nav-icon">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <path
+                          d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+                          stroke="currentColor"
+                          strokeWidth="1.7"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                    <span className="project-nav-name">{p.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-        <div className="search">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-            <circle
-              cx="11"
-              cy="11"
-              r="7"
-              stroke="currentColor"
-              strokeWidth="1.8"
-            />
-            <path
-              d="M21 21l-4-4"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-            />
-          </svg>
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search chats"
-          />
-        </div>
-
-        {activeProjectName && (
-          <div className="project-banner">
-            <span className="project-banner-icon">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+          <button
+            className="side-entry"
+            onClick={onOpenArtifacts}
+            title="Artifacts"
+          >
+            <span className="side-entry-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path
-                  d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+                  d="M12 3l9 5-9 5-9-5 9-5z"
                   stroke="currentColor"
                   strokeWidth="1.7"
                   strokeLinejoin="round"
                 />
+                <path
+                  d="M3 13l9 5 9-5"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </span>
-            <span className="project-banner-name">{activeProjectName}</span>
-            <button
-              type="button"
-              className="project-banner-exit"
-              onClick={() => onSelectProject(null)}
-              title="Exit project"
-              aria-label="Exit project"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M6 6l12 12M18 6L6 18"
+            Artifacts
+          </button>
+
+          <button
+            className="side-entry"
+            onClick={onOpenOrchestrator}
+            title="Orchestrator — plan and delegate across agents"
+          >
+            <span className="side-entry-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <circle
+                  cx="12"
+                  cy="5"
+                  r="2.4"
                   stroke="currentColor"
-                  strokeWidth="1.8"
+                  strokeWidth="1.7"
+                />
+                <circle
+                  cx="5"
+                  cy="18"
+                  r="2.4"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                />
+                <circle
+                  cx="19"
+                  cy="18"
+                  r="2.4"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                />
+                <path
+                  d="M12 7.4V12M12 12l-5.2 3.8M12 12l5.2 3.8"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
                   strokeLinecap="round"
                 />
               </svg>
-            </button>
-          </div>
-        )}
+            </span>
+            Orchestrator
+          </button>
 
-        <nav className="chat-list">
-          {filtered.length === 0 && (
-            <p className="empty-list">No chats found.</p>
-          )}
-          {pinned.length > 0 && (
-            <div>
-              <div className="section-label">Pinned</div>
-              {pinned.map((c) => renderItem(c))}
-            </div>
-          )}
-          {groups.map((group) => (
-            <div key={group.label}>
-              <div className="section-label">{group.label}</div>
-              {group.items.map((c) => renderItem(c))}
-            </div>
-          ))}
-        </nav>
-
-        <div className="tools-panel">
           <button
-            className="tools-head"
-            onClick={() => setToolsOpen((v) => !v)}
-            aria-expanded={toolsOpen}
+            className="side-entry"
+            onClick={() => onUseTool(AGENT_GUIDE_PROMPT)}
+            title="AI Agent Guide"
           >
-            <span>MCP tools</span>
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              className={toolsOpen ? "chev open" : "chev"}
+            <span className="side-entry-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M5 4h11a2 2 0 012 2v14H7a2 2 0 01-2-2V4z"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M9 8h6M9 12h6"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </span>
+            AI Agent Guide
+          </button>
+
+          <div className="tools-panel features-panel">
+            <button
+              className="tools-head"
+              onClick={() => setFeaturesOpen((v) => !v)}
+              aria-expanded={featuresOpen}
             >
-              <path
-                d="M6 9l6 6 6-6"
+              <span>Features</span>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                className={featuresOpen ? "chev open" : "chev"}
+              >
+                <path
+                  d="M6 9l6 6 6-6"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            {featuresOpen && (
+              <div className="tools-list">
+                {FEATURE_ITEMS.map((f) => (
+                  <button
+                    key={f.id}
+                    className="feature-item"
+                    onClick={() => onUseTool(f.prompt, f.mode ?? null)}
+                    title={f.label}
+                  >
+                    <span className="feature-icon">
+                      <FeatureIcon id={f.id} />
+                    </span>
+                    <span className="feature-label">{f.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="search">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+              <circle
+                cx="11"
+                cy="11"
+                r="7"
                 stroke="currentColor"
-                strokeWidth="2"
+                strokeWidth="1.8"
+              />
+              <path
+                d="M21 21l-4-4"
+                stroke="currentColor"
+                strokeWidth="1.8"
                 strokeLinecap="round"
-                strokeLinejoin="round"
               />
             </svg>
-          </button>
-          {toolsOpen && (
-            <div className="tools-list">
-              {servers.length === 0 && <p className="empty-list">Checking…</p>}
-              {servers.map((s) => {
-                const tools = SERVER_TOOLS[s.name] ?? [];
-                const open = expandedServer === s.name;
-                return (
-                  <div key={s.name}>
-                    <button
-                      className="tool-row server"
-                      onClick={() => setExpandedServer(open ? null : s.name)}
-                      aria-expanded={open}
-                      title="Show tools"
-                    >
-                      <span className={dotClass(s)} />
-                      <span className="tool-name">{s.name}</span>
-                      <span className="tool-status">
-                        {!s.configured ? "off" : s.ok ? "online" : "down"}
-                      </span>
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        className={open ? "chev open" : "chev"}
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search chats"
+            />
+          </div>
+
+          {activeProjectName && (
+            <div className="project-banner">
+              <span className="project-banner-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
+              <span className="project-banner-name">{activeProjectName}</span>
+              <button
+                type="button"
+                className="project-banner-exit"
+                onClick={() => onSelectProject(null)}
+                title="Exit project"
+                aria-label="Exit project"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M6 6l12 12M18 6L6 18"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          <nav className="chat-list">
+            {filtered.length === 0 && (
+              <p className="empty-list">No chats found.</p>
+            )}
+            {pinned.length > 0 && (
+              <div>
+                <div className="section-label">Pinned</div>
+                {pinned.map((c) => renderItem(c))}
+              </div>
+            )}
+            {groups.map((group) => (
+              <div key={group.label}>
+                <div className="section-label">{group.label}</div>
+                {group.items.map((c) => renderItem(c))}
+              </div>
+            ))}
+          </nav>
+
+          <div className="tools-panel">
+            <button
+              className="tools-head"
+              onClick={() => setToolsOpen((v) => !v)}
+              aria-expanded={toolsOpen}
+            >
+              <span>MCP tools</span>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                className={toolsOpen ? "chev open" : "chev"}
+              >
+                <path
+                  d="M6 9l6 6 6-6"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            {toolsOpen && (
+              <div className="tools-list">
+                {servers.length === 0 && (
+                  <p className="empty-list">Checking…</p>
+                )}
+                {servers.map((s) => {
+                  const tools = SERVER_TOOLS[s.name] ?? [];
+                  const open = expandedServer === s.name;
+                  return (
+                    <div key={s.name}>
+                      <button
+                        className="tool-row server"
+                        onClick={() => setExpandedServer(open ? null : s.name)}
+                        aria-expanded={open}
+                        title="Show tools"
                       >
-                        <path
-                          d="M6 9l6 6 6-6"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
+                        <span className={dotClass(s)} />
+                        <span className="tool-name">{s.name}</span>
+                        <span className="tool-status">
+                          {!s.configured ? "off" : s.ok ? "online" : "down"}
+                        </span>
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          className={open ? "chev open" : "chev"}
+                        >
+                          <path
+                            d="M6 9l6 6 6-6"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
+                      {open && tools.length > 0 && (
+                        <div className="tool-actions">
+                          {tools.map((t) => (
+                            <button
+                              key={t.name}
+                              className="tool-action"
+                              onClick={() => onUseTool(t.example)}
+                              title={`Draft: ${t.example}`}
+                            >
+                              <code>{t.name}</code>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {library.prompts.length + library.resources.length > 0 && (
+            <div className="tools-panel">
+              <button
+                className="tools-head"
+                onClick={() => setLibOpen((v) => !v)}
+                aria-expanded={libOpen}
+              >
+                <span>Prompts &amp; resources</span>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className={libOpen ? "chev open" : "chev"}
+                >
+                  <path
+                    d="M6 9l6 6 6-6"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              {libOpen && (
+                <div className="tools-list">
+                  {library.prompts.length > 0 && (
+                    <p className="lib-label">Prompts</p>
+                  )}
+                  {library.prompts.map((p) => (
+                    <button
+                      key={`${p.server}:${p.name}`}
+                      className="lib-item"
+                      onClick={() => usePrompt(p)}
+                      title={p.description ?? p.name}
+                    >
+                      <span className="lib-glyph">/</span>
+                      <span className="lib-text">{p.title ?? p.name}</span>
                     </button>
-                    {open && tools.length > 0 && (
-                      <div className="tool-actions">
-                        {tools.map((t) => (
-                          <button
-                            key={t.name}
-                            className="tool-action"
-                            onClick={() => onUseTool(t.example)}
-                            title={`Draft: ${t.example}`}
-                          >
-                            <code>{t.name}</code>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                  ))}
+                  {library.resources.length > 0 && (
+                    <p className="lib-label">Resources</p>
+                  )}
+                  {library.resources.map((r) => (
+                    <button
+                      key={`${r.server}:${r.uri}`}
+                      className="lib-item"
+                      onClick={() => useResource(r)}
+                      title={r.description ?? r.uri}
+                    >
+                      <span className="lib-glyph">@</span>
+                      <span className="lib-text">{r.title ?? r.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {bookmarks.length + templates.length > 0 && (
+            <div className="tools-panel">
+              <button
+                className="tools-head"
+                onClick={() => setSavedOpen((v) => !v)}
+                aria-expanded={savedOpen}
+              >
+                <span>Saved ({bookmarks.length + templates.length})</span>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className={savedOpen ? "chev open" : "chev"}
+                >
+                  <path
+                    d="M6 9l6 6 6-6"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              {savedOpen && (
+                <div className="tools-list">
+                  {templates.length > 0 && <p className="lib-label">Prompts</p>}
+                  {templates.map((t) => (
+                    <div key={t.id} className="saved-row">
+                      <button
+                        className="lib-item saved-main"
+                        onClick={() => onInsertTemplate(t.text)}
+                        title={t.text}
+                      >
+                        <span className="lib-glyph">/</span>
+                        <span className="lib-text">{t.title}</span>
+                      </button>
+                      <button
+                        className="saved-remove"
+                        aria-label="Delete prompt"
+                        onClick={() => onRemoveTemplate(t.id)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {bookmarks.length > 0 && (
+                    <p className="lib-label">Bookmarks</p>
+                  )}
+                  {bookmarks.map((b) => (
+                    <div key={b.id} className="saved-row">
+                      <button
+                        className="lib-item saved-main"
+                        onClick={() => onSelectBookmark(b.convoId)}
+                        title={b.text}
+                      >
+                        <span className="lib-glyph">★</span>
+                        <span className="lib-text">
+                          {b.text.replace(/\s+/g, " ").slice(0, 48)}
+                        </span>
+                      </button>
+                      <button
+                        className="saved-remove"
+                        aria-label="Delete bookmark"
+                        onClick={() => onRemoveBookmark(b.id)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
-
-        {library.prompts.length + library.resources.length > 0 && (
-          <div className="tools-panel">
-            <button
-              className="tools-head"
-              onClick={() => setLibOpen((v) => !v)}
-              aria-expanded={libOpen}
-            >
-              <span>Prompts &amp; resources</span>
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                className={libOpen ? "chev open" : "chev"}
-              >
-                <path
-                  d="M6 9l6 6 6-6"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-            {libOpen && (
-              <div className="tools-list">
-                {library.prompts.length > 0 && (
-                  <p className="lib-label">Prompts</p>
-                )}
-                {library.prompts.map((p) => (
-                  <button
-                    key={`${p.server}:${p.name}`}
-                    className="lib-item"
-                    onClick={() => usePrompt(p)}
-                    title={p.description ?? p.name}
-                  >
-                    <span className="lib-glyph">/</span>
-                    <span className="lib-text">{p.title ?? p.name}</span>
-                  </button>
-                ))}
-                {library.resources.length > 0 && (
-                  <p className="lib-label">Resources</p>
-                )}
-                {library.resources.map((r) => (
-                  <button
-                    key={`${r.server}:${r.uri}`}
-                    className="lib-item"
-                    onClick={() => useResource(r)}
-                    title={r.description ?? r.uri}
-                  >
-                    <span className="lib-glyph">@</span>
-                    <span className="lib-text">{r.title ?? r.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {bookmarks.length + templates.length > 0 && (
-          <div className="tools-panel">
-            <button
-              className="tools-head"
-              onClick={() => setSavedOpen((v) => !v)}
-              aria-expanded={savedOpen}
-            >
-              <span>Saved ({bookmarks.length + templates.length})</span>
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                className={savedOpen ? "chev open" : "chev"}
-              >
-                <path
-                  d="M6 9l6 6 6-6"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-            {savedOpen && (
-              <div className="tools-list">
-                {templates.length > 0 && <p className="lib-label">Prompts</p>}
-                {templates.map((t) => (
-                  <div key={t.id} className="saved-row">
-                    <button
-                      className="lib-item saved-main"
-                      onClick={() => onInsertTemplate(t.text)}
-                      title={t.text}
-                    >
-                      <span className="lib-glyph">/</span>
-                      <span className="lib-text">{t.title}</span>
-                    </button>
-                    <button
-                      className="saved-remove"
-                      aria-label="Delete prompt"
-                      onClick={() => onRemoveTemplate(t.id)}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-                {bookmarks.length > 0 && <p className="lib-label">Bookmarks</p>}
-                {bookmarks.map((b) => (
-                  <div key={b.id} className="saved-row">
-                    <button
-                      className="lib-item saved-main"
-                      onClick={() => onSelectBookmark(b.convoId)}
-                      title={b.text}
-                    >
-                      <span className="lib-glyph">★</span>
-                      <span className="lib-text">
-                        {b.text.replace(/\s+/g, " ").slice(0, 48)}
-                      </span>
-                    </button>
-                    <button
-                      className="saved-remove"
-                      aria-label="Delete bookmark"
-                      onClick={() => onRemoveBookmark(b.id)}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
 
         <div className="sidebar-foot">
           <button className="foot-btn" onClick={onToggleTheme}>

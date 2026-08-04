@@ -95,6 +95,14 @@ body {
   padding: 12px;
 }
 
+.sidebar-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
 .sidebar-head {
   display: flex;
   align-items: center;
@@ -158,8 +166,7 @@ body {
 }
 
 .chat-list {
-  flex: 1;
-  overflow-y: auto;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 2px;
