@@ -16,6 +16,8 @@
   --code-bg: rgba(26, 28, 35, 0.06);
   --overlay: rgba(26, 28, 35, 0.4);
   --shadow: rgba(26, 28, 35, 0.07);
+  --scrollbar-thumb: rgba(26, 28, 35, 0.16);
+  --scrollbar-thumb-hover: rgba(26, 28, 35, 0.32);
   --brand-grad: linear-gradient(135deg, #22d3ee 0%, #6366f1 52%, #8b5cf6 100%);
   --font:
     var(--font-geist-sans), ui-sans-serif, -apple-system, BlinkMacSystemFont,
@@ -40,6 +42,8 @@
   --code-bg: rgba(255, 255, 255, 0.08);
   --overlay: rgba(0, 0, 0, 0.55);
   --shadow: rgba(0, 0, 0, 0.45);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.13);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.28);
 }
 
 * {
@@ -65,6 +69,50 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+}
+
+/* ---- Minimalist, auto-hiding scrollbars ---- */
+/* Thin track, rounded thumb that stays invisible until the region is hovered
+   or focused, then fades in — modern and unobtrusive in both themes. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover,
+*:focus-within {
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.2s ease;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* ---- Layout shell (sidebar + chat) ---- */
@@ -99,6 +147,9 @@ body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
 }
