@@ -66,6 +66,7 @@ The composer supports **dictation** (speech-to-text mic) and one-click **image g
 - [Repository layout](#repository-layout)
 - [Prerequisites](#prerequisites)
 - [Quick start (local)](#quick-start-local)
+  - [Configure the LLM (local & cloud)](#configure-the-llm-local--cloud)
 - [Running & testing locally (step by step)](#running--testing-locally-step-by-step)
 - [Configuration reference](#configuration-reference)
 - [Deploy to Azure](#deploy-to-azure)
@@ -219,6 +220,64 @@ cp .env.example .env.local   # fill in Azure OpenAI + the MCP_*_URL values above
 npm install
 npm run dev                  # http://localhost:3000
 ```
+
+### Configure the LLM (local & cloud)
+
+The chat model is chosen from environment variables in `chat-ui/.env.local` (in
+Azure these are injected as secrets by Bicep). Selection logic lives in
+[chat-ui/lib/model.ts](chat-ui/lib/model.ts). Either **pick a provider
+explicitly** with `CHAT_PROVIDER=azure|openai|anthropic|local`, or **leave it
+blank to auto-detect** the first one configured, in order
+`azure → openai → anthropic → local`. You can configure several at once and
+switch between them in the model picker, or let **Auto** route by task
+complexity.
+
+**1. Create the env file**
+
+```bash
+cd chat-ui && cp .env.example .env.local
+```
+
+**2. Configure a provider** — set one (or more) of the blocks below in
+`.env.local`.
+
+Cloud (non-local):
+
+| Provider     | Required variables                                                                                          | Notes                                                  |
+| ------------ | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Azure OpenAI | `AZURE_OPENAI_RESOURCE_NAME`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT`, `AZURE_OPENAI_API_VERSION` | Resource **name** only (not the URL); deployment name. |
+| OpenAI       | `OPENAI_API_KEY`, `OPENAI_MODEL` (e.g. `gpt-4o`)                                                            | Simplest for local dev.                                |
+| Anthropic    | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (e.g. `claude-3-5-sonnet-latest`)                                    |                                                        |
+
+Local (any OpenAI-compatible server — model list is discovered from
+`GET /v1/models`, no real key needed):
+
+```bash
+CHAT_PROVIDER=local
+LOCAL_OPENAI_BASE_URL=http://localhost:1234/v1   # LM Studio default
+LOCAL_MODEL=qwen2.5-coder-7b-instruct            # fallback if /models is unreachable
+LOCAL_OPENAI_API_KEY=lm-studio                   # any non-empty string
+LOCAL_LABEL=Local (LM Studio)                    # optional picker label
+```
+
+Common local base URLs: **LM Studio** `http://localhost:1234/v1`, **Ollama**
+`http://localhost:11434/v1`, **vLLM** `http://localhost:8000/v1`, **llama.cpp**
+`http://localhost:8080/v1`. Start the server and load a model first.
+
+**3. (Optional) Auto routing** — override the cheap/powerful picks as
+`provider:model`:
+
+```bash
+AUTO_SIMPLE=local:qwen2.5-coder-7b-instruct
+AUTO_COMPLEX=anthropic:claude-3-5-sonnet-latest
+```
+
+**4. Restart & verify** — run `npm run dev`, open the model picker in the top
+bar (every configured provider appears, plus **Auto**), and send a test prompt.
+If no provider is set, the server returns a clear error listing the keys it
+accepts. In production, keep keys out of `.env.local` and set them as Container
+App secrets via Bicep; laptop-hosted local models aren't reachable from the
+cloud app.
 
 ---
 
